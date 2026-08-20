@@ -271,6 +271,12 @@
         <div class="small-note">Screenshot or photo of the locate area map. If Google Sheets Sync is configured, it's also uploaded to a shared "Fiber911 Locate Maps" Drive folder (named by incident #) so other devices can see it too.</div>
       </div>
 
+      <div class="field full">
+        <label>— or — Map URL (optional)</label>
+        <input type="text" id="f_siteMapUrlManual" placeholder="https://... (a direct link to an already-hosted image or PDF)">
+        <div class="small-note">Leave blank to use the upload above instead, or paste a link here to skip the upload entirely — useful as a fallback if the automatic upload doesn't go through.</div>
+      </div>
+
       <div class="row-btns">
         <button class="btn btn-primary btn-block" onclick="saveNewTicket()">Save &amp; Create Ticket</button>
       </div>
@@ -755,6 +761,37 @@ async function attachSiteMap(ticketId, event){
     showToast('Could not load that image');
   }
 }
+// Sets the Site Map URL directly, bypassing the whole upload pipeline —
+// useful as a manual fallback if the automatic Drive upload isn't going
+// through. Pushed to the sheet as an explicit targeted update (like
+// clearSiteMapOnSheets), since this is a deliberate action, not a regular
+// background sync — those intentionally never touch this field.
+function setSiteMapUrlManually(ticketId){
+  const url = document.getElementById('manualMapUrlInput').value.trim();
+  const t = TICKETS.find(x=>x.ticketId===ticketId);
+  if(!t) return;
+  t.siteMapUrl = url;
+  if(url) t.siteMap = ''; // a manually-set URL takes over as the source of truth for display
+  t.updatedAt = new Date().toISOString();
+  saveTickets(TICKETS);
+  renderActiveTable(); renderDoneTable(); if(cityMap) renderMapMarkers();
+  openDetail(ticketId);
+  showToast(url ? 'Map URL saved' : 'Map URL cleared');
+
+  const s = loadSettings();
+  if(s.sheetsUrl){
+    fetch(s.sheetsUrl, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({action:'upsert', ticket:{
+        'Ticket #': ticketId,
+        'Site Map URL': url,
+        'Site Map Attached': url ? 'Yes' : 'No',
+        'Updated At': t.updatedAt
+      }})
+    }).catch(()=>{});
+  }
+}
 function removeSiteMap(ticketId){
   const t = TICKETS.find(x=>x.ticketId===ticketId);
   if(!t) return;
@@ -794,7 +831,8 @@ async function saveNewTicket(){
     return;
   }
   const pendingSiteMap = currentSiteMapDataUrl; // captured before clearIntakeForm() wipes it
-  const pendingSiteMapUrl = pendingSiteMap ? '' : parsedSiteMapUrl; // local upload takes priority over a parsed link
+  const manualSiteMapUrl = val('f_siteMapUrlManual');
+  const pendingSiteMapUrl = pendingSiteMap ? '' : (manualSiteMapUrl || parsedSiteMapUrl); // local upload > manual URL > parsed link
   const isEmergency = document.getElementById('f_emergency').checked;
   const ticket = {
     ticketId: nextTicketId() + (isEmergency ? '-E' : ''),
@@ -852,7 +890,7 @@ async function saveNewTicket(){
 function val(id){ return document.getElementById(id).value.trim(); }
 function clearIntakeForm(){
   ['pasteInput','f_incident','f_issuedBy','f_addrNum','f_street','f_permitNum','f_oneview',
-   'f_approxAddr','f_latlng','f_ip','f_description','f_cityReceived','f_weReceived'].forEach(id=>{
+   'f_approxAddr','f_latlng','f_ip','f_description','f_cityReceived','f_weReceived','f_siteMapUrlManual'].forEach(id=>{
     document.getElementById(id).value='';
   });
   document.getElementById('f_permit').value='';
@@ -1096,6 +1134,14 @@ function openDetail(id){
       `}
       <input type="file" accept="image/*" id="modalMapInput" style="display:none;" onchange="attachSiteMap('${t.ticketId}', event)">
       ${t.workOrderPdfUrl ? `<div class="small-note" style="margin-top:8px;">Work Order PDF (with map): <a href="${t.workOrderPdfUrl}" target="_blank" rel="noopener">View</a> &nbsp;|&nbsp; <a href="${driveDownloadUrl(t.workOrderPdfUrl)}">Download</a></div>` : ''}
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+        <label>Set Map URL Manually</label>
+        <div class="settings-row">
+          <input type="text" id="manualMapUrlInput" placeholder="https://..." value="${esc(t.siteMapUrl)}">
+          <button class="btn btn-cyan" onclick="setSiteMapUrlManually('${t.ticketId}')">Save</button>
+        </div>
+        <div class="small-note">Paste any direct link here to set (or fix) the map without going through the upload — useful if the automatic Drive upload didn't go through.</div>
+      </div>
     </div>
     <button class="btn btn-red btn-block" onclick="deleteTicket('${t.ticketId}')">Delete Ticket</button>
   `;
