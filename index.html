@@ -292,6 +292,12 @@
       </div>
       <div class="small-note" id="lastSyncedNote">Not synced yet</div>
       <div id="settingsBox" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+        <label>Your Name (for attribution)</label>
+        <div class="settings-row">
+          <input type="text" id="userName" placeholder="e.g. Jason Turner">
+          <button class="btn btn-cyan" onclick="saveUserName()">Save</button>
+        </div>
+        <div class="small-note" style="margin-bottom:12px;">Auto-fills "Completed By" and tags tickets you create on this device. Set once per device — no login, just attribution.</div>
         <label>Google Apps Script Web App URL</label>
         <div class="settings-row">
           <input type="text" id="sheetsUrl" placeholder="https://script.google.com/macros/s/.../exec">
@@ -793,6 +799,7 @@ async function saveNewTicket(){
   const ticket = {
     ticketId: nextTicketId() + (isEmergency ? '-E' : ''),
     emergency: isEmergency ? 'Yes' : 'No',
+    createdBy: loadSettings().userName || '',
     incident, issuedBy: val('f_issuedBy'), contactEmail: val('f_contactEmail'), addrNum, street,
     permit: val('f_permit'), permitNum: val('f_permitNum'),
     oneview: val('f_oneview'), approxAddr: val('f_approxAddr'),
@@ -1045,6 +1052,7 @@ function openDetail(id){
       <div><span class="k">Incident:</span> ${esc(t.incident)}</div>
       <div><span class="k">Issued By:</span> ${esc(t.issuedBy)}</div>
       <div><span class="k">Contact Email:</span> ${esc(t.contactEmail)||'—'}</div>
+      <div><span class="k">Created By:</span> ${esc(t.createdBy)||'—'}</div>
       <div><span class="k">Address:</span> ${esc(t.addrNum)} ${esc(t.street)}</div>
       <div><span class="k">Permit:</span> ${esc(t.permit)} ${esc(t.permitNum)}</div>
       <div><span class="k">OneView ID:</span> ${esc(t.oneview)}</div>
@@ -1442,6 +1450,8 @@ function populateCompletionSelect(){
     `<option value="${t.ticketId}">${t.ticketId} — ${esc(t.addrNum)} ${esc(t.street)} (${esc(t.incident)||'no incident #'})</option>`
   ).join('');
   document.getElementById('c_completedAt').value = toLocalInputValue(new Date());
+  const completedByField = document.getElementById('c_completedBy');
+  if(!completedByField.value) completedByField.value = loadSettings().userName || '';
   renderCompletionSummary();
 }
 function renderCompletionSummary(){
@@ -1521,6 +1531,7 @@ function renderDoneTable(){
 const FIELD_MAP = [
   ['ticketId','Ticket #'],
   ['emergency','Emergency'],
+  ['createdBy','Created By'],
   ['incident','Incident #'],
   ['issuedBy','Issued By'],
   ['contactEmail','Contact Email'],
@@ -1619,6 +1630,15 @@ function toggleSettings(){
   const box = document.getElementById('settingsBox');
   box.style.display = box.style.display==='none' ? 'block':'none';
   document.getElementById('sheetsUrl').value = loadSettings().sheetsUrl || '';
+  document.getElementById('userName').value = loadSettings().userName || '';
+}
+function saveUserName(){
+  const name = document.getElementById('userName').value.trim();
+  saveSettings({...loadSettings(), userName: name});
+  showToast(name ? 'Name saved' : 'Name cleared');
+  // Refresh anywhere the name auto-fills so the change takes effect immediately.
+  const completedByField = document.getElementById('c_completedBy');
+  if(completedByField && !completedByField.value) completedByField.value = name;
 }
 function saveSheetsUrl(){
   const url = document.getElementById('sheetsUrl').value.trim();
@@ -1819,6 +1839,9 @@ populateCompletionSelect();
 updateLastSyncedDisplay();
 document.getElementById('f_weReceived').value = toLocalInputValue(new Date());
 document.getElementById('f_contactEmail').value = getInvoiceSettings().defaultContactEmail;
+if(!loadSettings().userName){
+  setTimeout(()=>showToast('Tip: set your name under Sheets Settings for attribution'), 1200);
+}
 // If this device already has a Sheets URL saved, quietly pull the latest on load
 // so it opens with everyone else's changes already visible.
 if(loadSettings().sheetsUrl){
