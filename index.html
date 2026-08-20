@@ -702,16 +702,28 @@ function clearSiteMap(){
 // CORS wall even though the upload completes fine server-side (confirmed via
 // the Executions log). A later Sync Now picks up the link via the normal GET
 // pull, which is known to work reliably.
-function uploadSiteMapToDrive(ticketId, incident, dataUrl){
+function workOrderFieldsPayload(t){
+  return {
+    ticketId: t.ticketId, incident: t.incident, issuedBy: t.issuedBy,
+    contactEmail: t.contactEmail, addrNum: t.addrNum, street: t.street,
+    permit: t.permit, permitNum: t.permitNum, oneview: t.oneview,
+    latlng: t.latlng, cityReceived: t.cityReceived, weReceived: t.weReceived,
+    description: t.description
+  };
+}
+function uploadSiteMapToDrive(t, dataUrl){
   const s = loadSettings();
   if(!s.sheetsUrl) return;
   const base64 = dataUrl.split(',')[1];
-  const filename = (incident ? incident+'_' : '') + ticketId + '.jpg';
+  const filename = (t.incident ? t.incident+'_' : '') + t.ticketId + '.jpg';
   console.log('Site map upload size:', Math.round(base64.length/1024)+'KB (base64), filename:', filename);
   fetch(s.sheetsUrl, {
     method:'POST',
     headers:{'Content-Type':'text/plain;charset=utf-8'},
-    body: JSON.stringify({action:'uploadImage', ticketId, filename, imageBase64: base64})
+    body: JSON.stringify({
+      action:'uploadImage', ticketId: t.ticketId, filename, imageBase64: base64,
+      workOrder: workOrderFieldsPayload(t) // lets the server also build a work order PDF with this same image embedded
+    })
   }).catch(e=>{
     // The browser may report this as failed even when Google's side
     // completed the upload fine — that's the known asymmetry here.
@@ -732,7 +744,7 @@ async function attachSiteMap(ticketId, event){
     renderActiveTable(); renderDoneTable();
     openDetail(ticketId);
     showToast('Site map attached — sending to Drive. Tap Sync Now in ~15s to get the shared link.');
-    uploadSiteMapToDrive(t.ticketId, t.incident, dataUrl);
+    uploadSiteMapToDrive(t, dataUrl);
   }catch(e){
     showToast('Could not load that image');
   }
@@ -799,13 +811,14 @@ async function saveNewTicket(){
   pushTicketToSheets(ticket);
 
   if(pendingSiteMap){
-    uploadSiteMapToDrive(ticket.ticketId, ticket.incident, pendingSiteMap);
+    uploadSiteMapToDrive(ticket, pendingSiteMap);
     showToast('Site map sent to Drive — tap Sync Now in ~15s to get the shared link.');
   } else if(pendingSiteMapUrl){
     // A direct image link was already in the pasted text (newer Cartegraph
-    // format) — no Drive upload needed, just write the link straight to the
-    // sheet. Safe to include "Site Map URL" here since this is a brand-new
-    // row with nothing on the server yet to accidentally overwrite.
+    // format) — no Drive upload needed for the raw image, but we still want
+    // a work order PDF with it embedded. Also write "Site Map URL" directly;
+    // safe here since this is a brand-new row with nothing on the server
+    // yet to accidentally overwrite.
     const sheetsUrl = loadSettings().sheetsUrl;
     if(sheetsUrl){
       fetch(sheetsUrl, {
@@ -816,6 +829,15 @@ async function saveNewTicket(){
           'Site Map URL': pendingSiteMapUrl,
           'Site Map Attached': 'Yes'
         }})
+      }).catch(()=>{});
+      fetch(sheetsUrl, {
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({
+          action:'generateWorkOrderPdf',
+          workOrder: workOrderFieldsPayload(ticket),
+          imageUrl: pendingSiteMapUrl
+        })
       }).catch(()=>{});
     }
   }
@@ -999,6 +1021,11 @@ function renderActiveTable(){
 }
 function fmt(v){ if(!v) return '—'; return v.replace('T',' '); }
 function esc(s){ return (s||'').toString().replace(/</g,'&lt;'); }
+// Our Drive links are saved as "export=view" (opens inline in the browser).
+// Swapping to "export=download" forces an actual file download instead.
+function driveDownloadUrl(viewUrl){
+  return (viewUrl||'').replace('export=view','export=download');
+}
 // Renders the "Map" column cell: a real clickable link when a Drive URL has
 // synced, or just an indicator (not a link — data: URIs don't open reliably
 // in a new tab) when the map only exists locally on this device so far.
@@ -1038,7 +1065,7 @@ function openDetail(id){
           <div><span class="k">Time to Complete:</span> ${esc(t.duration)} hrs</div>
           <div><span class="k">Footage Traced:</span> ${esc(t.footage)||'—'}</div>
           <div><span class="k">Invoice #:</span> ${esc(t.invoiceNum)||'—'}</div>
-          ${t.invoicePdfUrl ? `<div><span class="k">Invoice PDF:</span> <a href="${t.invoicePdfUrl}" target="_blank" rel="noopener">View on Drive</a></div>` : ''}
+          ${t.invoicePdfUrl ? `<div><span class="k">Invoice PDF:</span> <a href="${t.invoicePdfUrl}" target="_blank" rel="noopener">View</a> &nbsp;|&nbsp; <a href="${driveDownloadUrl(t.invoicePdfUrl)}">Download</a></div>` : ''}
           <div><span class="k">Notes:</span> ${esc(t.notes)||'—'}</div>
         </div>` : ''}
     </div>
@@ -1054,11 +1081,13 @@ function openDetail(id){
         <div class="row-btns">
           <button class="btn btn-ghost" onclick="document.getElementById('modalMapInput').click()">Replace Image</button>
           <button class="btn btn-red" onclick="removeSiteMap('${t.ticketId}')">Remove</button>
+          ${t.siteMapUrl ? `<a class="btn btn-ghost" href="${driveDownloadUrl(t.siteMapUrl)}" style="text-decoration:none;">Download</a>` : ''}
         </div>
       ` : `
         <div class="row-btns"><button class="btn btn-cyan" onclick="document.getElementById('modalMapInput').click()">Attach Site Map</button></div>
       `}
       <input type="file" accept="image/*" id="modalMapInput" style="display:none;" onchange="attachSiteMap('${t.ticketId}', event)">
+      ${t.workOrderPdfUrl ? `<div class="small-note" style="margin-top:8px;">Work Order PDF (with map): <a href="${t.workOrderPdfUrl}" target="_blank" rel="noopener">View</a> &nbsp;|&nbsp; <a href="${driveDownloadUrl(t.workOrderPdfUrl)}">Download</a></div>` : ''}
     </div>
     <button class="btn btn-red btn-block" onclick="deleteTicket('${t.ticketId}')">Delete Ticket</button>
   `;
@@ -1507,6 +1536,7 @@ const FIELD_MAP = [
   ['weReceived','Time We Received'],
   ['siteMapUrl','Site Map URL'],
   ['invoicePdfUrl','Invoice PDF URL'],
+  ['workOrderPdfUrl','Work Order PDF URL'],
   ['status','Status'],
   ['completedBy','Completed By'],
   ['completedAt','Completed At'],
@@ -1536,6 +1566,7 @@ function ticketToSyncRow(t){
   const row = ticketToRow(t);
   delete row['Site Map URL'];
   delete row['Invoice PDF URL'];
+  delete row['Work Order PDF URL'];
   return row;
 }
 // Sheet row object (as returned by doGet) -> internal ticket shape.
