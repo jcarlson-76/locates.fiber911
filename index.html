@@ -174,8 +174,9 @@
 
   .toast{
     position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
-    background:var(--navy);color:#fff;padding:11px 20px;border-radius:30px;font-size:13.5px;font-weight:600;
+    background:var(--navy);color:#fff;padding:11px 20px;border-radius:16px;font-size:13.5px;font-weight:600;
     box-shadow:0 4px 14px rgba(0,0,0,.2);z-index:2100;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;
+    max-width:88vw;white-space:normal;text-align:center;line-height:1.4;
   }
   .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px);}
 
@@ -274,7 +275,7 @@
       <div class="field full">
         <label>— or — Map URL (optional)</label>
         <input type="text" id="f_siteMapUrlManual" placeholder="https://... (a direct link to an already-hosted image or PDF)">
-        <div class="small-note">Leave blank to use the upload above instead, or paste a link here to skip the upload entirely — useful as a fallback if the automatic upload doesn't go through.</div>
+        <div class="small-note">Leave blank to use the upload above instead. Must be a link anyone can open without logging in — don't paste a TeamDynamix portal link here, it requires your TDX login and won't work for anyone else.</div>
       </div>
 
       <div class="row-btns">
@@ -648,13 +649,25 @@ function parsePastedOrder(){
   // browsers may block as mixed content on a secure page — if the preview
   // doesn't show, that's why, and a manual screenshot/upload still works.
   const imageUrlMatch = text.match(/Image:\s*\[?(https?:\/\/[^\]\s\)]+)/i);
+  let missingImageHint = '';
   if(imageUrlMatch){
     parsedSiteMapUrl = imageUrlMatch[1];
     document.getElementById('siteMapPreview').src = parsedSiteMapUrl;
     document.getElementById('siteMapPreviewWrap').style.display = 'block';
+  } else {
+    // No link found — figure out whether that's expected (no photo at all)
+    // or whether one likely exists but just isn't in the copyable text,
+    // which is common for TeamDynamix tickets specifically.
+    const mediaCountMatch = text.match(/AttachedMediaCount:\s*([1-9]\d*)/i);
+    const looksLikeTeamDynamix = /service request id/i.test(text);
+    if(mediaCountMatch){
+      missingImageHint = ' This ticket shows an attached photo, but no link was in the text — check the Attachments and upload it manually below.';
+    } else if(looksLikeTeamDynamix){
+      missingImageHint = ' TeamDynamix often doesn\'t include the photo link in the copyable text — check its Attachments tab and upload manually below if there is one.';
+    }
   }
 
-  showToast('Fields parsed — review before saving');
+  showToast('Fields parsed — review before saving.' + missingImageHint);
 }
 function toLocalInputValue(d){
   const pad = n=>String(n).padStart(2,'0');
@@ -1140,7 +1153,7 @@ function openDetail(id){
           <input type="text" id="manualMapUrlInput" placeholder="https://..." value="${esc(t.siteMapUrl)}">
           <button class="btn btn-cyan" onclick="setSiteMapUrlManually('${t.ticketId}')">Save</button>
         </div>
-        <div class="small-note">Paste any direct link here to set (or fix) the map without going through the upload — useful if the automatic Drive upload didn't go through.</div>
+        <div class="small-note">Must be a link anyone can open without logging in (e.g. a Drive share link). Don't paste a TeamDynamix portal link here — that requires your TDX login and won't work for anyone else. If you only have the image itself, use "Replace Image" above instead — that uploads it to your own Drive automatically.</div>
       </div>
     </div>
     <button class="btn btn-red btn-block" onclick="deleteTicket('${t.ticketId}')">Delete Ticket</button>
@@ -1875,7 +1888,9 @@ function showToast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 2200);
+  const duration = Math.min(Math.max(2200, msg.length * 60), 6500);
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(()=>t.classList.remove('show'), duration);
 }
 
 /* ---------- Init ---------- */
