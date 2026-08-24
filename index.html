@@ -263,19 +263,9 @@
       </div>
 
       <div class="field full">
-        <label>Site Map / Locate Diagram (optional)</label>
-        <input type="file" accept="image/*" id="f_siteMapFile" onchange="handleSiteMapUpload(event)">
-        <div id="siteMapPreviewWrap" style="margin-top:8px;display:none;">
-          <img id="siteMapPreview" style="max-width:100%;border-radius:8px;border:1px solid var(--border);display:block;">
-          <div class="row-btns"><button class="btn btn-ghost" type="button" onclick="clearSiteMap()">Remove Image</button></div>
-        </div>
-        <div class="small-note">Screenshot or photo of the locate area map. If Google Sheets Sync is configured, it's also uploaded to a shared "Fiber911 Locate Maps" Drive folder (named by incident #) so other devices can see it too.</div>
-      </div>
-
-      <div class="field full">
-        <label>— or — Map URL (optional)</label>
-        <input type="text" id="f_siteMapUrlManual" placeholder="https://... (a direct link to an already-hosted image or PDF)">
-        <div class="small-note">Leave blank to use the upload above instead. Must be a link anyone can open without logging in — don't paste a TeamDynamix portal link here, it requires your TDX login and won't work for anyone else.</div>
+        <label>Site Maps / Locate Diagrams (optional, up to 4)</label>
+        <div class="small-note" style="margin-bottom:10px;">Each slot accepts either a file upload or a direct URL. If Google Sheets Sync is configured, uploads go to a shared "Fiber911 Locate Maps" Drive folder so other devices can see them too.</div>
+        <div id="intakeSiteMapSlots"></div>
       </div>
 
       <div class="row-btns">
@@ -346,7 +336,9 @@
       <div class="hint">Select an open ticket, fill in completion details, and submit. It will move to the Completed Log.</div>
       <div class="row-btns" style="margin-bottom:10px;">
         <button class="btn btn-cyan" onclick="syncNow()">Sync Now</button>
+        <a class="btn btn-gold" href="https://forms.gle/6wL8MkmGhqCy2DqE6" target="_blank" rel="noopener" style="text-decoration:none;">Open Tech Completion Form</a>
       </div>
+      <div class="small-note" style="margin-bottom:10px;">The form techs use to submit their completion — separate from this app's own data. Once a completion invoice comes back from it, paste the invoice text below to update the ticket here.</div>
       <div class="small-note" id="lastSyncedNoteCompletion" style="margin-bottom:10px;">Not synced yet</div>
 
       <div class="field full">
@@ -652,8 +644,8 @@ function parsePastedOrder(){
   let missingImageHint = '';
   if(imageUrlMatch){
     parsedSiteMapUrl = imageUrlMatch[1];
-    document.getElementById('siteMapPreview').src = parsedSiteMapUrl;
-    document.getElementById('siteMapPreviewWrap').style.display = 'block';
+    document.getElementById('siteMapPreview1').src = parsedSiteMapUrl;
+    document.getElementById('siteMapPreviewWrap1').style.display = 'block';
   } else {
     // No link found — figure out whether that's expected (no photo at all)
     // or whether one likely exists but just isn't in the copyable text,
@@ -674,9 +666,38 @@ function toLocalInputValue(d){
   return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
 }
 
-/* ---------- Site Map Image Handling ---------- */
-let currentSiteMapDataUrl = null;
-let parsedSiteMapUrl = null; // set by parsePastedOrder() when the pasted text includes a direct image link
+/* ---------- Site Map Image Handling (up to 4 slots per ticket) ---------- */
+// Slot 1 keeps the original unsuffixed field names (siteMap/siteMapUrl) for
+// backward compatibility with everything already synced; slots 2-4 are new.
+let pendingIntakeSiteMaps = {1:null, 2:null, 3:null, 4:null}; // local base64, keyed by slot, while filling out the Intake form
+let parsedSiteMapUrl = null; // set by parsePastedOrder() when the pasted text includes a direct image link — always fills slot 1
+
+function siteMapSlotFieldKey(slot, kind){
+  // kind is 'local' or 'url'. Slot 1 uses the original unsuffixed names.
+  const base = kind==='local' ? 'siteMap' : 'siteMapUrl';
+  return slot===1 ? base : base+slot;
+}
+function siteMapSlotColumnName(slot){
+  return slot===1 ? 'Site Map URL' : 'Site Map URL '+slot;
+}
+function intakeSlotHtml(slot){
+  return `
+    <div class="ticket-summary" style="margin-bottom:10px;">
+      <div style="font-weight:600;margin-bottom:8px;color:var(--navy);">Site Map ${slot}</div>
+      <input type="file" accept="image/*" id="f_siteMapFile${slot}" onchange="handleSiteMapUpload(event, ${slot})">
+      <div id="siteMapPreviewWrap${slot}" style="margin-top:8px;display:none;">
+        <img id="siteMapPreview${slot}" style="max-width:100%;border-radius:8px;border:1px solid var(--border);display:block;">
+        <div class="row-btns"><button class="btn btn-ghost" type="button" onclick="clearSiteMap(${slot})">Remove Image</button></div>
+      </div>
+      <div style="margin-top:8px;">
+        <label style="margin-bottom:4px;">— or — Map URL</label>
+        <input type="text" id="f_siteMapUrlManual${slot}" placeholder="https://... (a direct link to an already-hosted image)">
+      </div>
+    </div>`;
+}
+function renderIntakeSiteMapSlots(){
+  document.getElementById('intakeSiteMapSlots').innerHTML = [1,2,3,4].map(intakeSlotHtml).join('');
+}
 
 // Resizes/compresses to keep localStorage usage reasonable (matches the
 // 1280px / JPEG 0.72 pattern used across the rest of the Fiber911 tool suite).
@@ -700,22 +721,26 @@ function compressImage(file, maxWidth, quality){
     reader.readAsDataURL(file);
   });
 }
-async function handleSiteMapUpload(event){
+async function handleSiteMapUpload(event, slot){
   const file = event.target.files[0];
   if(!file) return;
   try{
-    currentSiteMapDataUrl = await compressImage(file, 900, 0.55);
-    document.getElementById('siteMapPreview').src = currentSiteMapDataUrl;
-    document.getElementById('siteMapPreviewWrap').style.display = 'block';
+    pendingIntakeSiteMaps[slot] = await compressImage(file, 900, 0.55);
+    document.getElementById('siteMapPreview'+slot).src = pendingIntakeSiteMaps[slot];
+    document.getElementById('siteMapPreviewWrap'+slot).style.display = 'block';
   }catch(e){
     showToast('Could not load that image');
   }
 }
-function clearSiteMap(){
-  currentSiteMapDataUrl = null;
-  parsedSiteMapUrl = null;
-  document.getElementById('siteMapPreviewWrap').style.display = 'none';
-  document.getElementById('f_siteMapFile').value = '';
+function clearSiteMap(slot){
+  pendingIntakeSiteMaps[slot] = null;
+  if(slot===1) parsedSiteMapUrl = null;
+  document.getElementById('siteMapPreviewWrap'+slot).style.display = 'none';
+  document.getElementById('f_siteMapFile'+slot).value = '';
+  document.getElementById('f_siteMapUrlManual'+slot).value = '';
+}
+function clearAllIntakeSiteMaps(){
+  [1,2,3,4].forEach(clearSiteMap);
 }
 // Uploads a compressed image to the shared Drive folder via Apps Script,
 // named after the incident (falling back to the ticket # if no incident
@@ -736,18 +761,20 @@ function workOrderFieldsPayload(t){
     description: t.description
   };
 }
-function uploadSiteMapToDrive(t, dataUrl){
+function uploadSiteMapToDrive(t, dataUrl, slot){
   const s = loadSettings();
   if(!s.sheetsUrl) return;
   const base64 = dataUrl.split(',')[1];
-  const filename = (t.incident ? t.incident+'_' : '') + t.ticketId + '.jpg';
-  console.log('Site map upload size:', Math.round(base64.length/1024)+'KB (base64), filename:', filename);
+  const suffix = slot===1 ? '' : '_'+slot;
+  const filename = (t.incident ? t.incident+'_' : '') + t.ticketId + suffix + '.jpg';
+  console.log('Site map upload size:', Math.round(base64.length/1024)+'KB (base64), filename:', filename, 'slot:', slot);
   fetch(s.sheetsUrl, {
     method:'POST',
     headers:{'Content-Type':'text/plain;charset=utf-8'},
     body: JSON.stringify({
       action:'uploadImage', ticketId: t.ticketId, filename, imageBase64: base64,
-      workOrder: workOrderFieldsPayload(t) // lets the server also build a work order PDF with this same image embedded
+      siteMapColumn: siteMapSlotColumnName(slot),
+      workOrder: workOrderFieldsPayload(t) // lets the server also build a work order PDF with all attached images embedded
     })
   }).catch(e=>{
     // The browser may report this as failed even when Google's side
@@ -756,20 +783,20 @@ function uploadSiteMapToDrive(t, dataUrl){
   });
 }
 // Attach or replace the map on an existing ticket from the detail view.
-async function attachSiteMap(ticketId, event){
+async function attachSiteMap(ticketId, event, slot){
   const file = event.target.files[0];
   if(!file) return;
   try{
     const dataUrl = await compressImage(file, 900, 0.55);
     const t = TICKETS.find(x=>x.ticketId===ticketId);
     if(!t) return;
-    t.siteMap = dataUrl;
+    t[siteMapSlotFieldKey(slot,'local')] = dataUrl;
     t.updatedAt = new Date().toISOString();
     saveTickets(TICKETS);
     renderActiveTable(); renderDoneTable();
     openDetail(ticketId);
     showToast('Site map attached — sending to Drive. Tap Sync Now in ~15s to get the shared link.');
-    uploadSiteMapToDrive(t, dataUrl);
+    uploadSiteMapToDrive(t, dataUrl, slot);
   }catch(e){
     showToast('Could not load that image');
   }
@@ -779,12 +806,12 @@ async function attachSiteMap(ticketId, event){
 // through. Pushed to the sheet as an explicit targeted update (like
 // clearSiteMapOnSheets), since this is a deliberate action, not a regular
 // background sync — those intentionally never touch this field.
-function setSiteMapUrlManually(ticketId){
-  const url = document.getElementById('manualMapUrlInput').value.trim();
+function setSiteMapUrlManually(ticketId, slot){
+  const url = document.getElementById('manualMapUrlInput'+slot).value.trim();
   const t = TICKETS.find(x=>x.ticketId===ticketId);
   if(!t) return;
-  t.siteMapUrl = url;
-  if(url) t.siteMap = ''; // a manually-set URL takes over as the source of truth for display
+  t[siteMapSlotFieldKey(slot,'url')] = url;
+  if(url) t[siteMapSlotFieldKey(slot,'local')] = ''; // a manually-set URL takes over as the source of truth for display
   t.updatedAt = new Date().toISOString();
   saveTickets(TICKETS);
   renderActiveTable(); renderDoneTable(); if(cityMap) renderMapMarkers();
@@ -798,29 +825,30 @@ function setSiteMapUrlManually(ticketId){
       headers:{'Content-Type':'text/plain;charset=utf-8'},
       body: JSON.stringify({action:'upsert', ticket:{
         'Ticket #': ticketId,
-        'Site Map URL': url,
-        'Site Map Attached': url ? 'Yes' : 'No',
+        [siteMapSlotColumnName(slot)]: url,
+        'Site Map Attached': anySiteMapAttached(t) ? 'Yes' : 'No',
         'Updated At': t.updatedAt
       }})
     }).catch(()=>{});
   }
 }
-function removeSiteMap(ticketId){
+function removeSiteMap(ticketId, slot){
   const t = TICKETS.find(x=>x.ticketId===ticketId);
   if(!t) return;
-  t.siteMap = '';
-  t.siteMapUrl = '';
+  t[siteMapSlotFieldKey(slot,'local')] = '';
+  t[siteMapSlotFieldKey(slot,'url')] = '';
   t.updatedAt = new Date().toISOString();
   saveTickets(TICKETS);
   renderActiveTable(); renderDoneTable();
   openDetail(ticketId);
   showToast('Site map removed');
   pushTicketToSheets(t);
-  clearSiteMapOnSheets(ticketId);
+  clearSiteMapOnSheets(ticketId, slot, anySiteMapAttached(t));
 }
-// Regular syncs deliberately never touch "Site Map URL" (see ticketToSyncRow),
-// so an intentional removal needs its own explicit, targeted update.
-function clearSiteMapOnSheets(ticketId){
+// Regular syncs deliberately never touch "Site Map URL" columns (see
+// ticketToSyncRow), so an intentional removal needs its own explicit,
+// targeted update.
+function clearSiteMapOnSheets(ticketId, slot, stillAttached){
   const s = loadSettings();
   if(!s.sheetsUrl) return;
   fetch(s.sheetsUrl, {
@@ -828,10 +856,14 @@ function clearSiteMapOnSheets(ticketId){
     headers:{'Content-Type':'text/plain;charset=utf-8'},
     body: JSON.stringify({action:'upsert', ticket:{
       'Ticket #': ticketId,
-      'Site Map URL': '',
-      'Site Map Attached': 'No'
+      [siteMapSlotColumnName(slot)]: '',
+      'Site Map Attached': stillAttached ? 'Yes' : 'No'
     }})
   }).catch(()=>{ /* silent */ });
+}
+// True if any of the 4 slots (local or Drive-hosted) currently has an image.
+function anySiteMapAttached(t){
+  return [1,2,3,4].some(slot => t[siteMapSlotFieldKey(slot,'local')] || t[siteMapSlotFieldKey(slot,'url')]);
 }
 
 /* ---------- Save New Ticket ---------- */
@@ -843,9 +875,14 @@ async function saveNewTicket(){
     showToast('Add at least an incident # or street before saving');
     return;
   }
-  const pendingSiteMap = currentSiteMapDataUrl; // captured before clearIntakeForm() wipes it
-  const manualSiteMapUrl = val('f_siteMapUrlManual');
-  const pendingSiteMapUrl = pendingSiteMap ? '' : (manualSiteMapUrl || parsedSiteMapUrl); // local upload > manual URL > parsed link
+  // Capture all 4 slots' pending state before clearIntakeForm() wipes it.
+  // Priority per slot: local upload > manual URL > (slot 1 only) parsed link from pasted text.
+  const pendingSlots = [1,2,3,4].map(slot=>{
+    const local = pendingIntakeSiteMaps[slot];
+    const manualUrl = val('f_siteMapUrlManual'+slot);
+    const url = local ? '' : (manualUrl || (slot===1 ? parsedSiteMapUrl : null) || '');
+    return {slot, local: local||'', url};
+  });
   const isEmergency = document.getElementById('f_emergency').checked;
   const ticket = {
     ticketId: nextTicketId() + (isEmergency ? '-E' : ''),
@@ -856,10 +893,13 @@ async function saveNewTicket(){
     oneview: val('f_oneview'), approxAddr: val('f_approxAddr'),
     latlng: val('f_latlng'), ip: val('f_ip'), description: val('f_description'),
     cityReceived: val('f_cityReceived'), weReceived: val('f_weReceived') || toLocalInputValue(new Date()),
-    siteMap: pendingSiteMap || '', siteMapUrl: pendingSiteMapUrl || '',
     status: 'open', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     completedBy:'', completedAt:'', duration:'', footage:'', notes:''
   };
+  pendingSlots.forEach(({slot, local, url})=>{
+    ticket[siteMapSlotFieldKey(slot,'local')] = local;
+    ticket[siteMapSlotFieldKey(slot,'url')] = url;
+  });
   TICKETS.push(ticket);
   saveTickets(TICKETS);
   clearIntakeForm();
@@ -868,48 +908,53 @@ async function saveNewTicket(){
   showToast('Ticket '+ticket.ticketId+' created');
   pushTicketToSheets(ticket);
 
-  if(pendingSiteMap){
-    uploadSiteMapToDrive(ticket, pendingSiteMap);
-    showToast('Site map sent to Drive — tap Sync Now in ~15s to get the shared link.');
-  } else if(pendingSiteMapUrl){
-    // A direct image link was already in the pasted text (newer Cartegraph
-    // format) — no Drive upload needed for the raw image, but we still want
-    // a work order PDF with it embedded. Also write "Site Map URL" directly;
-    // safe here since this is a brand-new row with nothing on the server
-    // yet to accidentally overwrite.
-    const sheetsUrl = loadSettings().sheetsUrl;
-    if(sheetsUrl){
+  const sheetsUrl = loadSettings().sheetsUrl;
+  let anySlotHadContent = false;
+  pendingSlots.forEach(({slot, local, url})=>{
+    if(local){
+      anySlotHadContent = true;
+      uploadSiteMapToDrive(ticket, local, slot);
+    } else if(url && sheetsUrl){
+      anySlotHadContent = true;
+      // A direct image link was already available (parsed from pasted text,
+      // or entered manually) — no Drive upload needed for the raw image,
+      // but we still write it straight to the sheet. Safe here since this
+      // is a brand-new row with nothing on the server yet to overwrite.
       fetch(sheetsUrl, {
         method:'POST',
         headers:{'Content-Type':'text/plain;charset=utf-8'},
         body: JSON.stringify({action:'upsert', ticket:{
           'Ticket #': ticket.ticketId,
-          'Site Map URL': pendingSiteMapUrl,
+          [siteMapSlotColumnName(slot)]: url,
           'Site Map Attached': 'Yes'
         }})
       }).catch(()=>{});
+    }
+  });
+  if(sheetsUrl && anySlotHadContent){
+    // Build the work order PDF once, after all slots above have been sent —
+    // the server gathers whichever images have landed in the sheet by the
+    // time this runs and embeds all of them.
+    setTimeout(()=>{
       fetch(sheetsUrl, {
         method:'POST',
         headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body: JSON.stringify({
-          action:'generateWorkOrderPdf',
-          workOrder: workOrderFieldsPayload(ticket),
-          imageUrl: pendingSiteMapUrl
-        })
+        body: JSON.stringify({ action:'generateWorkOrderPdf', workOrder: workOrderFieldsPayload(ticket) })
       }).catch(()=>{});
-    }
+    }, 4000);
+    showToast('Site map(s) sent to Drive — tap Sync Now in ~15s to get the shared link(s).');
   }
 }
 function val(id){ return document.getElementById(id).value.trim(); }
 function clearIntakeForm(){
   ['pasteInput','f_incident','f_issuedBy','f_addrNum','f_street','f_permitNum','f_oneview',
-   'f_approxAddr','f_latlng','f_ip','f_description','f_cityReceived','f_weReceived','f_siteMapUrlManual'].forEach(id=>{
+   'f_approxAddr','f_latlng','f_ip','f_description','f_cityReceived','f_weReceived'].forEach(id=>{
     document.getElementById(id).value='';
   });
   document.getElementById('f_permit').value='';
   document.getElementById('f_emergency').checked = false;
   document.getElementById('f_contactEmail').value = getInvoiceSettings().defaultContactEmail;
-  clearSiteMap();
+  clearAllIntakeSiteMaps();
 }
 
 /* ---------- Counts ---------- */
@@ -1088,12 +1133,55 @@ function driveDownloadUrl(viewUrl){
 // synced, or just an indicator (not a link — data: URIs don't open reliably
 // in a new tab) when the map only exists locally on this device so far.
 function mapCell(t){
-  if(t.siteMapUrl) return `<a href="${t.siteMapUrl}" target="_blank" rel="noopener" title="Open site map">📍 View</a>`;
-  if(t.siteMap) return `<span title="Only on this device — not yet synced to Drive">📍 Local</span>`;
+  const urls = [1,2,3,4].map(s=>t[siteMapSlotFieldKey(s,'url')]).filter(Boolean);
+  const totalCount = [1,2,3,4].filter(s=>t[siteMapSlotFieldKey(s,'url')] || t[siteMapSlotFieldKey(s,'local')]).length;
+  if(urls.length){
+    const label = totalCount>1 ? `📍 View (${totalCount})` : '📍 View';
+    return `<a href="${urls[0]}" target="_blank" rel="noopener" title="Open site map">${label}</a>`;
+  }
+  if(totalCount){
+    const label = totalCount>1 ? `📍 Local (${totalCount})` : '📍 Local';
+    return `<span title="Only on this device — not yet synced to Drive">${label}</span>`;
+  }
   return '—';
 }
 
 /* ---------- Detail Modal ---------- */
+// Renders one Site Map slot in the ticket detail modal: shows the image
+// (local copy takes display priority over the Drive link when both exist,
+// since it's guaranteed current) plus Attach/Replace/Remove/Download
+// controls and a manual URL override, matching the pattern already used
+// for the single-slot version, just parameterized by slot number.
+function detailSiteMapSlotHtml(t, slot){
+  const local = t[siteMapSlotFieldKey(slot,'local')];
+  const url = t[siteMapSlotFieldKey(slot,'url')];
+  const inputId = 'modalMapInput'+slot;
+  const urlInputId = 'manualMapUrlInput'+slot;
+  return `
+    <div class="ticket-summary" style="margin-bottom:10px;">
+      <div style="font-weight:600;margin-bottom:6px;color:var(--navy);">Site Map ${slot}</div>
+      ${(local || url) ? `
+        <img src="${local || url}" style="max-width:100%;border-radius:8px;border:1px solid var(--border);margin-bottom:6px;display:block;">
+        ${(!local && url) ? '<div class="small-note" style="margin-bottom:8px;">Synced from another device via Google Drive.</div>' : ''}
+        <div class="row-btns">
+          <button class="btn btn-ghost" onclick="document.getElementById('${inputId}').click()">Replace Image</button>
+          <button class="btn btn-red" onclick="removeSiteMap('${t.ticketId}', ${slot})">Remove</button>
+          ${url ? `<a class="btn btn-ghost" href="${driveDownloadUrl(url)}" style="text-decoration:none;">Download</a>` : ''}
+        </div>
+      ` : `
+        <div class="row-btns"><button class="btn btn-cyan" onclick="document.getElementById('${inputId}').click()">Attach Site Map</button></div>
+      `}
+      <input type="file" accept="image/*" id="${inputId}" style="display:none;" onchange="attachSiteMap('${t.ticketId}', event, ${slot})">
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+        <label>Set Map URL Manually</label>
+        <div class="settings-row">
+          <input type="text" id="${urlInputId}" placeholder="https://..." value="${esc(url)}">
+          <button class="btn btn-cyan" onclick="setSiteMapUrlManually('${t.ticketId}', ${slot})">Save</button>
+        </div>
+        <div class="small-note">Must be a link anyone can open without logging in. Don't paste a TeamDynamix portal link — that requires your TDX login and won't work for anyone else.</div>
+      </div>
+    </div>`;
+}
 function openDetail(id){
   const t = TICKETS.find(x=>x.ticketId===id);
   if(!t) return;
@@ -1133,28 +1221,9 @@ function openDetail(id){
       ${t.status==='completed' ? `<button class="btn btn-primary btn-block" onclick="generateInvoicePDF('${t.ticketId}')">Generate Invoice</button>` : ''}
     </div>
     <div style="margin-bottom:14px;">
-      <label>Site Map</label>
-      ${(t.siteMap || t.siteMapUrl) ? `
-        <img src="${t.siteMap || t.siteMapUrl}" style="max-width:100%;border-radius:8px;border:1px solid var(--border);margin-bottom:6px;display:block;">
-        ${(!t.siteMap && t.siteMapUrl) ? '<div class="small-note" style="margin-bottom:8px;">Synced from another device via Google Drive.</div>' : ''}
-        <div class="row-btns">
-          <button class="btn btn-ghost" onclick="document.getElementById('modalMapInput').click()">Replace Image</button>
-          <button class="btn btn-red" onclick="removeSiteMap('${t.ticketId}')">Remove</button>
-          ${t.siteMapUrl ? `<a class="btn btn-ghost" href="${driveDownloadUrl(t.siteMapUrl)}" style="text-decoration:none;">Download</a>` : ''}
-        </div>
-      ` : `
-        <div class="row-btns"><button class="btn btn-cyan" onclick="document.getElementById('modalMapInput').click()">Attach Site Map</button></div>
-      `}
-      <input type="file" accept="image/*" id="modalMapInput" style="display:none;" onchange="attachSiteMap('${t.ticketId}', event)">
-      ${t.workOrderPdfUrl ? `<div class="small-note" style="margin-top:8px;">Work Order PDF (with map): <a href="${t.workOrderPdfUrl}" target="_blank" rel="noopener">View</a> &nbsp;|&nbsp; <a href="${driveDownloadUrl(t.workOrderPdfUrl)}">Download</a></div>` : ''}
-      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
-        <label>Set Map URL Manually</label>
-        <div class="settings-row">
-          <input type="text" id="manualMapUrlInput" placeholder="https://..." value="${esc(t.siteMapUrl)}">
-          <button class="btn btn-cyan" onclick="setSiteMapUrlManually('${t.ticketId}')">Save</button>
-        </div>
-        <div class="small-note">Must be a link anyone can open without logging in (e.g. a Drive share link). Don't paste a TeamDynamix portal link here — that requires your TDX login and won't work for anyone else. If you only have the image itself, use "Replace Image" above instead — that uploads it to your own Drive automatically.</div>
-      </div>
+      <label>Site Maps (up to 4)</label>
+      ${[1,2,3,4].map(slot=>detailSiteMapSlotHtml(t, slot)).join('')}
+      ${t.workOrderPdfUrl ? `<div class="small-note" style="margin-top:8px;">Work Order PDF (with all maps): <a href="${t.workOrderPdfUrl}" target="_blank" rel="noopener">View</a> &nbsp;|&nbsp; <a href="${driveDownloadUrl(t.workOrderPdfUrl)}">Download</a></div>` : ''}
     </div>
     <button class="btn btn-red btn-block" onclick="deleteTicket('${t.ticketId}')">Delete Ticket</button>
   `;
@@ -1179,7 +1248,7 @@ function toggleEmergency(ticketId){
 function exportTicketPDF(ticketId){
   const t = TICKETS.find(x=>x.ticketId===ticketId);
   if(!t) return;
-  const mapImg = t.siteMap || t.siteMapUrl;
+  const mapImgs = [1,2,3,4].map(s=>t[siteMapSlotFieldKey(s,'local')] || t[siteMapSlotFieldKey(s,'url')]).filter(Boolean);
   const win = window.open('', '_blank');
   if(!win){ showToast('Pop-up blocked — allow pop-ups to export PDF'); return; }
   const rows = (label, value) => `<tr><td class="k">${label}</td><td>${esc(value)||'—'}</td></tr>`;
@@ -1227,7 +1296,7 @@ function exportTicketPDF(ticketId){
       ${rows('Notes', t.notes)}
     </table>` : ''}
 
-    ${mapImg ? `<h2>Site Map</h2><img src="${mapImg}">` : ''}
+    ${mapImgs.length ? `<h2>Site Map${mapImgs.length>1?'s':''}</h2>` + mapImgs.map(img=>`<img src="${img}" style="max-width:100%;margin-bottom:10px;display:block;">`).join('') : ''}
     </body></html>`);
   win.document.close();
   win.focus();
@@ -1328,7 +1397,7 @@ function pushInvoiceToDrive(t, inv, invoiceNum, hours, footage, hoursAmount, foo
     hours, footage,
     hourlyRate: inv.hourlyRate, footageRate: inv.footageRate,
     hoursAmount, footageAmount, total,
-    imageLink: t.siteMapUrl || ''
+    imageLink: [1,2,3,4].map(s=>t[siteMapSlotFieldKey(s,'url')]).filter(Boolean).join(', ')
   };
   fetch(s.sheetsUrl, {
     method: 'POST',
@@ -1447,9 +1516,34 @@ function parseCompletionPaste(){
   const text = document.getElementById('completionPasteInput').value;
   if(!text.trim()){ showToast('Paste the completion invoice text first'); return; }
 
-  const workOrder = grabInvoiceField(text, /Work Order\s*#\s*(\d+)/i);
-  const hours = grabInvoiceField(text, /Locate Man Hrs\D+(\d+(?:\.\d+)?)/i);
-  const footage = grabInvoiceField(text, /Locatable Mule Tape Footage\D+(\d+(?:\.\d+)?)/i);
+  // Work Order #: try the normal adjacent match first, then fall back to
+  // Arlington's distinctive incident-number pattern (7 digits starting with
+  // 30) found anywhere in the text — this still works even when the PDF's
+  // text extraction separates the label from its value.
+  let workOrder = grabInvoiceField(text, /Work Order\s*#\s*(\d+)/i);
+  if(!workOrder){
+    const woMatch = text.match(/\b(30\d{5})\b/);
+    if(woMatch) workOrder = woMatch[1];
+  }
+
+  // Some invoices copy out with all the header labels clustered together
+  // before their values (seen from certain PDF viewers) — detect that
+  // layout specifically, since hours/footage sit in different relative
+  // positions than the normal layout.
+  const isJumbledLayout = /Invoice Date:\s*Work Order\s*#\s*Project ID#\s*ATT:/i.test(text);
+  let hours, footage;
+  if(isJumbledLayout){
+    // Footage's qty still sits right after its own label; hours' qty gets
+    // pushed to sit just before the footage row's label instead.
+    footage = grabInvoiceField(text, /Locatable Mule Tape Footage\s*(\d{1,3}(?:\.\d+)?)\b/i);
+    hours = grabInvoiceField(text, /\b(\d{1,3}(?:\.\d+)?)\b\s*Locatable Mule Tape Footage/i);
+  } else {
+    // Require a short, standalone (word-boundary-bounded) number so this can
+    // never accidentally swallow part of a longer number sitting nearby,
+    // like an invoice # (INV-13684) or the work order #.
+    hours = grabInvoiceField(text, /Locate Man Hrs[^\d]{0,20}?\b(\d{1,3}(?:\.\d+)?)\b(?!\d)/i);
+    footage = grabInvoiceField(text, /Locatable Mule Tape Footage[^\d]{0,20}?\b(\d{1,3}(?:\.\d+)?)\b(?!\d)/i);
+  }
   const bidNum = grabInvoiceField(text, /Bid#:?\s*([\w-]+)/i);
   const invoiceDate = grabInvoiceField(text, /(\d{1,2}\/\d{1,2}\/\d{4})/);
   const total = grabInvoiceField(text, /Total\s*\$?\s*([\d,.]+)/i);
@@ -1605,6 +1699,9 @@ const FIELD_MAP = [
   ['cityReceived','Time City Received'],
   ['weReceived','Time We Received'],
   ['siteMapUrl','Site Map URL'],
+  ['siteMapUrl2','Site Map URL 2'],
+  ['siteMapUrl3','Site Map URL 3'],
+  ['siteMapUrl4','Site Map URL 4'],
   ['invoicePdfUrl','Invoice PDF URL'],
   ['workOrderPdfUrl','Work Order PDF URL'],
   ['status','Status'],
@@ -1622,7 +1719,7 @@ const FIELD_MAP = [
 function ticketToRow(t){
   const row = {};
   FIELD_MAP.forEach(([key,col])=>{ row[col] = t[key] !== undefined ? t[key] : ''; });
-  row['Site Map Attached'] = (t.siteMap || t.siteMapUrl) ? 'Yes' : 'No';
+  row['Site Map Attached'] = anySiteMapAttached(t) ? 'Yes' : 'No';
   return row;
 }
 // Same as ticketToRow, but WITHOUT "Site Map URL". Used only for regular
@@ -1635,6 +1732,9 @@ function ticketToRow(t){
 function ticketToSyncRow(t){
   const row = ticketToRow(t);
   delete row['Site Map URL'];
+  delete row['Site Map URL 2'];
+  delete row['Site Map URL 3'];
+  delete row['Site Map URL 4'];
   delete row['Invoice PDF URL'];
   delete row['Work Order PDF URL'];
   return row;
@@ -1894,6 +1994,7 @@ function showToast(msg){
 }
 
 /* ---------- Init ---------- */
+renderIntakeSiteMapSlots();
 renderActiveTable();
 renderDoneTable();
 populateCompletionSelect();
