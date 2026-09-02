@@ -1,0 +1,1860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Project Quote | Fiber911</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#0b1f3a;
+  --navy-2:#122a4d;
+  --navy-3:#193660;
+  --orange:#ff7a1a;
+  --orange-dim:#b85a00;
+  --paper:#f5f7fa;
+  --ink:#0d1b2e;
+  --line:#e1e6ee;
+  --danger:#e0525c;
+  --ok:#2fbf82;
+  --radius:14px;
+  --touch:44px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:'Inter',system-ui,sans-serif;
+  -webkit-tap-highlight-color:transparent;
+  padding-bottom:96px;
+}
+h1,h2,h3{font-family:'Sora',sans-serif;margin:0;}
+.mono{font-family:'JetBrains Mono',monospace;}
+
+/* ---------- Top bar ---------- */
+.topbar{
+  position:sticky;top:0;z-index:50;
+  background:linear-gradient(180deg,var(--navy) 0%, var(--navy-2) 100%);
+  color:#fff;
+  padding:10px 14px;
+  display:flex;align-items:center;justify-content:space-between;
+  box-shadow:0 2px 10px rgba(0,0,0,.18);
+}
+.topbar-title{display:flex;align-items:center;gap:9px;}
+.topbar-title .dot{width:9px;height:9px;border-radius:50%;background:var(--orange);box-shadow:0 0 8px var(--orange);}
+.topbar-title h1{font-size:16px;letter-spacing:.2px;}
+.topbar-title span{display:block;font-size:10px;color:#9fb4d6;letter-spacing:.6px;text-transform:uppercase;font-family:'Inter';}
+.save-pill{
+  font-size:11px;color:#bcd2ee;display:flex;align-items:center;gap:6px;
+  padding:6px 10px;border-radius:20px;background:rgba(255,255,255,.06);
+}
+.save-pill .ind{width:7px;height:7px;border-radius:50%;background:var(--ok);transition:background .2s;}
+.save-pill.saving .ind{background:var(--orange);}
+.menu-btn{
+  width:var(--touch);height:var(--touch);display:flex;align-items:center;justify-content:center;
+  background:transparent;border:none;color:#fff;font-size:20px;cursor:pointer;
+}
+
+/* ---------- Scroll-spy tabs ---------- */
+.tabstrip{
+  position:sticky;top:52px;z-index:49;
+  display:flex;gap:6px;overflow-x:auto;
+  background:var(--navy-2);
+  padding:9px 10px;
+  scrollbar-width:none;
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+.tabstrip::-webkit-scrollbar{display:none;}
+.tab-btn{
+  flex:0 0 auto;
+  padding:8px 14px;
+  border-radius:20px;
+  font-size:12.5px;font-weight:600;
+  color:#a9c1e0;background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.08);
+  white-space:nowrap;cursor:pointer;
+  min-height:36px;
+}
+.tab-btn.active{
+  background:var(--orange);color:var(--navy);
+  border-color:var(--orange);
+}
+
+/* ---------- Layout ---------- */
+.wrap{padding:16px 12px 8px;max-width:720px;margin:0 auto;}
+.card{
+  background:#fff;
+  border-radius:var(--radius);
+  border:1px solid var(--line);
+  margin-bottom:18px;
+  overflow:hidden;
+  scroll-margin-top:110px;
+  box-shadow:0 1px 2px rgba(11,31,58,.04);
+}
+.card-head{
+  padding:14px 16px 12px;
+  border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:10px;
+  background:linear-gradient(180deg,#fbfcfe,#fff);
+}
+.card-head .num{
+  width:26px;height:26px;border-radius:8px;flex:0 0 auto;
+  background:var(--navy);color:var(--orange);
+  font-family:'JetBrains Mono';font-weight:700;font-size:12px;
+  display:flex;align-items:center;justify-content:center;
+}
+.card-head h2{font-size:15px;color:var(--navy);}
+.card-head .sub{font-size:11.5px;color:#7c8aa0;margin-top:1px;}
+.card-body{padding:14px 16px 18px;}
+
+label{
+  display:block;font-size:11.5px;font-weight:600;color:#5c6b83;
+  text-transform:uppercase;letter-spacing:.4px;margin:12px 0 5px;
+}
+label:first-child{margin-top:0;}
+input[type=text],input[type=email],input[type=tel],input[type=date],input[type=number],textarea{
+  width:100%;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:11px 12px;
+  font-size:14.5px;
+  font-family:'Inter';
+  color:var(--ink);
+  background:#fbfcfe;
+  min-height:var(--touch);
+}
+input:focus,textarea:focus{outline:2px solid var(--orange);outline-offset:1px;border-color:var(--orange);}
+textarea{resize:vertical;line-height:1.5;}
+textarea#scopeText{resize:none;overflow:hidden;}
+
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+/* ---------- Header logos ---------- */
+.logo-row{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:nowrap;gap:12px;margin-bottom:6px;}
+.logo-slot{
+  border:2px dashed var(--line);
+  border-radius:12px;
+  width:240px;max-width:47%;aspect-ratio:240/180;
+  flex:0 1 auto;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:5px;cursor:pointer;position:relative;overflow:hidden;
+  background:#fafbfd;
+}
+.logo-slot img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff;padding:10px;}
+.logo-slot .ph-icon{font-size:26px;color:#aab6c8;}
+.logo-slot .ph-text{font-size:12px;color:#8b98ac;font-weight:600;text-align:center;padding:0 6px;line-height:1.3;}
+.logo-slot .tag{
+  position:absolute;bottom:6px;left:6px;right:6px;
+  font-size:9.5px;text-transform:uppercase;letter-spacing:.4px;font-weight:700;
+  text-align:center;color:#fff;background:rgba(11,31,58,.72);
+  border-radius:6px;padding:3px 0;
+}
+.logo-slot .remove-x{
+  position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;
+  background:rgba(11,31,58,.75);color:#fff;font-size:13px;display:none;
+  align-items:center;justify-content:center;z-index:2;
+}
+.logo-slot.has-img .remove-x{display:flex;}
+
+/* ---------- Map upload ---------- */
+.map-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.btn{
+  min-height:var(--touch);
+  border-radius:10px;
+  font-size:13.5px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  cursor:pointer;border:none;
+}
+.btn-primary{background:var(--navy);color:#fff;}
+.btn-outline{background:#fff;color:var(--navy);border:1.5px solid var(--navy-3);}
+.btn-orange{background:var(--orange);color:var(--navy);}
+.btn-ghost{background:transparent;color:var(--orange-dim);border:1px solid var(--line);}
+.btn-danger{background:transparent;color:var(--danger);border:1px solid #f3c9cc;}
+.btn:active{transform:scale(.97);}
+
+.map-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;}
+.map-thumb{
+  position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;
+  border:1px solid var(--line);
+}
+.map-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.map-thumb .rm{
+  position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;
+  background:rgba(11,31,58,.75);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;
+}
+.map-empty{
+  margin-top:12px;padding:22px 10px;text-align:center;
+  border:1.5px dashed var(--line);border-radius:12px;
+  color:#8b98ac;font-size:12.5px;
+}
+
+/* ---------- Quote tables ---------- */
+.subhead{
+  display:flex;align-items:center;justify-content:space-between;
+  margin:18px 0 8px;
+}
+.subhead:first-of-type{margin-top:2px;}
+.subhead h3{font-size:12.5px;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;}
+.add-row-btn{
+  font-size:12px;font-weight:700;color:var(--orange-dim);
+  background:#fff3e8;border:1px solid #ffd9b3;border-radius:8px;
+  padding:6px 10px;display:flex;align-items:center;gap:5px;
+  min-height:32px;cursor:pointer;
+}
+.line-item{
+  border:1px solid var(--line);border-radius:10px;
+  padding:10px;margin-bottom:8px;background:#fbfcfe;
+  display:grid;grid-template-columns:1fr;gap:8px;
+}
+.li-top{display:flex;gap:8px;align-items:flex-start;}
+.li-top input[type=text]{flex:1;}
+.li-del{
+  width:36px;height:36px;flex:0 0 auto;border-radius:8px;
+  background:#fff;border:1px solid #f3c9cc;color:var(--danger);
+  font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;
+}
+.li-nums{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.li-nums .field label{font-size:9.5px;margin:0 0 3px;}
+.li-nums input{padding:8px 9px;font-size:13px;min-height:38px;}
+.li-total{
+  text-align:right;font-family:'JetBrains Mono';font-size:13px;color:var(--navy);
+  font-weight:700;
+}
+
+.totals-box{
+  margin-top:14px;border-top:2px solid var(--navy);padding-top:12px;
+}
+.totals-line{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:6px 2px;font-size:13.5px;color:#3d4a5f;
+}
+.totals-line.grand{
+  font-size:17px;font-weight:800;color:var(--navy);
+  border-top:1px solid var(--line);margin-top:6px;padding-top:12px;
+}
+.totals-line .val{font-family:'JetBrains Mono';font-weight:700;}
+.tax-row{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+.tax-row input{width:70px;text-align:right;min-height:36px;padding:6px 8px;}
+
+/* ---------- Signatures ---------- */
+.sig-block{margin-top:8px;}
+.sig-canvas-wrap{
+  border:1.5px dashed var(--line);border-radius:12px;background:#fbfcfe;
+  position:relative;overflow:hidden;
+}
+canvas.sigpad{width:100%;height:150px;display:block;touch-action:none;}
+.sig-placeholder{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  color:#a7b3c6;font-size:12.5px;pointer-events:none;
+}
+.sig-tools{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
+.sig-tools .hint{font-size:11px;color:#8b98ac;}
+.agree-box{
+  display:flex;gap:9px;align-items:flex-start;
+  background:#f6f9fd;border:1px solid var(--line);border-radius:10px;
+  padding:10px 12px;margin:14px 0 4px;font-size:12.5px;color:#3d4a5f;line-height:1.45;
+}
+.agree-box input{width:18px;height:18px;margin-top:1px;flex:0 0 auto;}
+
+hr.div{border:none;border-top:1px solid var(--line);margin:22px 0;}
+
+/* ---------- Bottom bar ---------- */
+.bottombar{
+  position:fixed;bottom:0;left:0;right:0;z-index:60;
+  background:#fff;border-top:1px solid var(--line);
+  box-shadow:0 -2px 12px rgba(11,31,58,.08);
+  display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+  max-width:720px;margin:0 auto;
+}
+.bottombar .btn{flex:1;font-size:13px;}
+
+/* ---------- Menu sheet ---------- */
+.sheet-backdrop{
+  position:fixed;inset:0;background:rgba(11,31,58,.45);z-index:80;display:none;
+}
+.sheet-backdrop.open{display:block;}
+.sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:81;
+  background:#fff;border-radius:16px 16px 0 0;
+  padding:10px 14px calc(14px + env(safe-area-inset-bottom));
+  transform:translateY(100%);transition:transform .22s ease;
+  max-width:720px;margin:0 auto;
+}
+.sheet.open{transform:translateY(0);}
+.sheet .grabber{width:36px;height:4px;background:var(--line);border-radius:3px;margin:4px auto 12px;}
+.sheet-item{
+  display:flex;align-items:center;gap:12px;padding:13px 6px;font-size:14.5px;font-weight:600;
+  color:var(--ink);border-bottom:1px solid #f0f2f6;cursor:pointer;
+}
+.sheet-item:last-child{border-bottom:none;}
+.sheet-item.danger{color:var(--danger);}
+.sheet-item.connected{color:var(--ok);font-weight:700;}
+.sheet-item.muted{color:#9aa6ba;}
+.open-row{
+  display:flex;flex-direction:column;gap:2px;
+  padding:11px 6px;border-bottom:1px solid #f0f2f6;cursor:pointer;
+}
+.open-row:last-child{border-bottom:none;}
+.open-row .or-title{font-size:14px;font-weight:700;color:var(--ink);}
+.open-row .or-sub{font-size:11.5px;color:#8b98ac;}
+.open-empty{padding:18px 6px;text-align:center;color:#9aa6ba;font-size:12.5px;}
+.pl-group-label{
+  font-size:10.5px;font-weight:800;color:var(--orange-dim);text-transform:uppercase;letter-spacing:.5px;
+  padding:10px 6px 4px;
+}
+.pl-row{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  padding:10px 6px;border-bottom:1px solid #f0f2f6;cursor:pointer;
+}
+.pl-row:active{background:#fff3e8;}
+.pl-row .pl-desc{font-size:13px;color:var(--ink);line-height:1.4;flex:1;}
+.pl-row .pl-id{font-family:'JetBrains Mono';font-size:10px;color:#9aa6ba;margin-right:6px;}
+.pl-row .pl-rate{
+  flex:0 0 auto;text-align:right;font-family:'JetBrains Mono';font-size:12.5px;font-weight:700;color:var(--navy);
+}
+.pl-row .pl-rate .unit{display:block;font-size:9.5px;font-weight:600;color:#9aa6ba;text-transform:uppercase;}
+
+/* Toast */
+.toast{
+  position:fixed;bottom:78px;left:50%;transform:translateX(-50%) translateY(10px);
+  background:var(--navy);color:#fff;font-size:13px;font-weight:600;
+  padding:10px 18px;border-radius:30px;box-shadow:0 4px 14px rgba(0,0,0,.25);
+  opacity:0;transition:opacity .2s, transform .2s;z-index:90;pointer-events:none;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* Hidden file inputs */
+.hidden-input{
+  position:absolute;
+  width:1px;height:1px;
+  padding:0;margin:-1px;
+  overflow:hidden;
+  clip:rect(0,0,0,0);
+  white-space:nowrap;
+  border:0;
+  opacity:0;
+}
+
+/* ---------- Print ---------- */
+/* ---------- Print-only formatted report ---------- */
+.print-only{display:none;}
+.pv-page{font-family:'Inter',sans-serif;color:#16202f;max-width:100%;}
+.pv-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:3px solid #0b1f3a;padding-bottom:14px;margin-bottom:18px;}
+.pv-logo-block{display:flex;align-items:center;gap:12px;}
+.pv-logo-img{max-width:100px;max-height:64px;object-fit:contain;}
+.pv-company-name{font-family:'Sora';font-size:14px;font-weight:700;color:#0b1f3a;}
+.pv-title-block{text-align:right;flex:0 0 auto;}
+.pv-title-block h1{font-family:'Sora';font-size:20px;color:#0b1f3a;margin:0 0 5px;letter-spacing:.2px;}
+.pv-meta{font-size:11px;color:#5c6b83;line-height:1.55;}
+.pv-meta b{color:#16202f;}
+.pv-parties{display:flex;justify-content:space-between;gap:26px;margin-bottom:22px;}
+.pv-party{flex:1;font-size:12px;}
+.pv-party-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.pv-party-top img{max-width:60px;max-height:36px;object-fit:contain;}
+.pv-party h4{font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;color:#8b98ac;margin:0 0 6px;font-weight:700;}
+.pv-party p{margin:0 0 2px;line-height:1.5;}
+.pv-section{margin-bottom:20px;page-break-inside:avoid;}
+.pv-section h3{font-family:'Sora';font-size:12.5px;color:#0b1f3a;text-transform:uppercase;letter-spacing:.5px;border-bottom:1.5px solid #dfe4ec;padding-bottom:6px;margin:0 0 10px;}
+.pv-section .pv-body-text{font-size:12.5px;line-height:1.65;white-space:pre-wrap;margin:0;color:#2b3a52;}
+.pv-map-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.pv-map-grid img{width:100%;height:118px;object-fit:cover;border-radius:6px;border:1px solid #dfe4ec;}
+table.pv-table{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:6px;}
+table.pv-table th{text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.3px;color:#5c6b83;border-bottom:2px solid #0b1f3a;padding:6px 7px;font-weight:700;}
+table.pv-table td{padding:7px;border-bottom:1px solid #e8ebf0;color:#2b3a52;}
+table.pv-table td.num, table.pv-table th.num{text-align:right;font-family:'JetBrains Mono';white-space:nowrap;}
+.pv-subgroup-label{font-size:10.5px;font-weight:700;color:#5c6b83;text-transform:uppercase;letter-spacing:.4px;margin:12px 0 6px;}
+.pv-subgroup-label:first-child{margin-top:0;}
+.pv-totals{width:270px;margin-left:auto;font-size:12px;margin-top:8px;}
+.pv-totals .tline{display:flex;justify-content:space-between;padding:4px 2px;color:#3d4a5f;}
+.pv-totals .tline .val{font-family:'JetBrains Mono';}
+.pv-totals .grand{display:flex;justify-content:space-between;border-top:2px solid #0b1f3a;margin-top:5px;padding-top:9px;font-weight:800;font-size:15.5px;color:#0b1f3a;}
+.pv-notes{font-size:11px;color:#5c6b83;line-height:1.55;white-space:pre-wrap;border-top:1px dashed #dfe4ec;padding-top:10px;margin-top:14px;}
+.pv-sign-grid{display:flex;gap:40px;margin-top:14px;}
+.pv-sign-box{flex:1;}
+.pv-sign-img{max-height:56px;max-width:230px;display:block;margin-bottom:6px;}
+.pv-sign-line{border-bottom:1.4px solid #16202f;height:40px;margin-bottom:6px;}
+.pv-sign-name{font-size:12.5px;font-weight:700;color:#16202f;}
+.pv-sign-sub{font-size:11px;color:#5c6b83;margin-top:1px;}
+.pv-sign-label{font-size:9.5px;color:#8b98ac;text-transform:uppercase;letter-spacing:.4px;margin-top:6px;}
+.pv-footer{margin-top:26px;border-top:1px solid #dfe4ec;padding-top:8px;font-size:9px;color:#9aa6ba;display:flex;justify-content:space-between;}
+
+@media print{
+  @page{ margin:14mm 12mm; }
+  .print-only{display:block !important;}
+  .wrap,.topbar,.tabstrip,.bottombar,.sheet,.sheet-backdrop,.toast{display:none !important;}
+  body{padding-bottom:0;background:#fff;}
+}
+
+@media (min-width:600px){
+  .li-top input[type=text]{font-size:14.5px;}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-title">
+    <span class="dot"></span>
+    <div>
+      <h1>Project Quote</h1>
+      <span>Fiber911</span>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <div class="save-pill" id="savePill"><span class="ind"></span><span id="saveText">Saved</span></div>
+    <button class="menu-btn" id="menuBtn" aria-label="Menu">&#8942;</button>
+  </div>
+</div>
+
+<div class="tabstrip" id="tabstrip">
+  <button class="tab-btn" data-target="sec-header">Header</button>
+  <button class="tab-btn" data-target="sec-scope">Scope</button>
+  <button class="tab-btn" data-target="sec-objective">Objective</button>
+  <button class="tab-btn" data-target="sec-map">Map</button>
+  <button class="tab-btn" data-target="sec-quote">Quote</button>
+  <button class="tab-btn" data-target="sec-signoff">Presented By</button>
+</div>
+
+<div class="wrap">
+
+  <!-- 1. PROJECT HEADER -->
+  <div class="card" id="sec-header">
+    <div class="card-head">
+      <div class="num">1</div>
+      <div>
+        <h2>Project Header</h2>
+        <div class="sub">Company &amp; customer identity</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="logo-row">
+        <div class="logo-slot" id="companyLogoSlot">
+          <div class="ph-icon">&#127970;</div>
+          <div class="ph-text">Tap to add<br>Company Logo</div>
+          <span class="tag">Company</span>
+          <div class="remove-x" data-remove="company">&times;</div>
+        </div>
+        <div class="logo-slot" id="customerLogoSlot">
+          <div class="ph-icon">&#128100;</div>
+          <div class="ph-text">Tap to add<br>Customer Logo</div>
+          <span class="tag">Customer</span>
+          <div class="remove-x" data-remove="customer">&times;</div>
+        </div>
+      </div>
+      <input type="file" accept="image/*" class="hidden-input" id="companyLogoInput">
+      <input type="file" accept="image/*" class="hidden-input" id="customerLogoInput">
+
+      <label>Project Name</label>
+      <input type="text" id="projectName" placeholder="e.g. Arlington Municipal OSP Expansion">
+
+      <div class="field-row">
+        <div>
+          <label>Quote #</label>
+          <input type="text" id="quoteNumber" placeholder="Q-2026-0001">
+        </div>
+        <div>
+          <label>Date</label>
+          <input type="date" id="quoteDate">
+        </div>
+      </div>
+
+      <label>Project Address / Site</label>
+      <input type="text" id="projectAddress" placeholder="Street, City, State">
+
+      <hr class="div" style="margin:16px 0;">
+
+      <div class="field-row">
+        <div>
+          <label>Customer Name</label>
+          <input type="text" id="customerName" placeholder="Contact name">
+        </div>
+        <div>
+          <label>Customer Company</label>
+          <input type="text" id="customerCompany" placeholder="Company / municipality">
+        </div>
+      </div>
+      <div class="field-row">
+        <div>
+          <label>Customer Phone</label>
+          <input type="tel" id="customerPhone" placeholder="(000) 000-0000">
+        </div>
+        <div>
+          <label>Customer Email</label>
+          <input type="email" id="customerEmail" placeholder="name@company.com">
+        </div>
+      </div>
+
+      <label>Prepared By</label>
+      <input type="text" id="preparedBy" placeholder="Your name / company">
+    </div>
+  </div>
+
+  <!-- 2. SCOPE OF WORK -->
+  <div class="card" id="sec-scope">
+    <div class="card-head">
+      <div class="num">2</div>
+      <div>
+        <h2>Project Scope of Work</h2>
+        <div class="sub">What will be performed</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <label>Scope Description</label>
+      <textarea id="scopeText" rows="6" placeholder="Describe the work to be performed: splicing, OSP construction, sensor deployment, testing, restoration, etc."></textarea>
+    </div>
+  </div>
+
+  <!-- 3. PROJECT OBJECTIVE -->
+  <div class="card" id="sec-objective">
+    <div class="card-head">
+      <div class="num">3</div>
+      <div>
+        <h2>Project Objective</h2>
+        <div class="sub">The goal this project achieves</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <label>Objective Statement</label>
+      <textarea id="objectiveText" rows="4" placeholder="State the desired outcome, e.g. restore fiber continuity and harden the enclosure against future tamper events."></textarea>
+    </div>
+  </div>
+
+  <!-- 4. PROJECT MAP -->
+  <div class="card" id="sec-map">
+    <div class="card-head">
+      <div class="num">4</div>
+      <div>
+        <h2>Project Map</h2>
+        <div class="sub">Site photos or map captures</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="map-actions">
+        <button class="btn btn-primary" id="mapCameraBtn">&#128247; Take Photo</button>
+        <button class="btn btn-outline" id="mapLibraryBtn">&#128193; From Library</button>
+      </div>
+      <input type="file" accept="image/*" capture="environment" class="hidden-input" id="mapCameraInput">
+      <input type="file" accept="image/*" multiple class="hidden-input" id="mapLibraryInput">
+
+      <div class="map-empty" id="mapEmpty">No map images added yet</div>
+      <div class="map-grid" id="mapGrid"></div>
+    </div>
+  </div>
+
+  <!-- 5. LABOR & MATERIAL QUOTE -->
+  <div class="card" id="sec-quote">
+    <div class="card-head">
+      <div class="num">5</div>
+      <div>
+        <h2>Labor &amp; Material Quote</h2>
+        <div class="sub">Line-item pricing</div>
+      </div>
+    </div>
+    <div class="card-body">
+
+      <button class="btn btn-orange" id="priceListBtn" style="width:100%;margin-bottom:16px;">&#128179; Add from Price List</button>
+
+      <div class="subhead">
+        <h3>Labor</h3>
+        <button class="add-row-btn" id="addLaborBtn">+ Add Labor</button>
+      </div>
+      <div id="laborList"></div>
+
+      <div class="subhead">
+        <h3>Materials</h3>
+        <button class="add-row-btn" id="addMaterialBtn">+ Add Material</button>
+      </div>
+      <div id="materialList"></div>
+
+      <div class="totals-box">
+        <div class="totals-line"><span>Labor Subtotal</span><span class="val mono" id="laborSubtotal">$0.00</span></div>
+        <div class="totals-line"><span>Materials Subtotal</span><span class="val mono" id="materialSubtotal">$0.00</span></div>
+        <div class="totals-line tax-row">
+          <span>Tax Rate (%)</span>
+          <input type="number" id="taxRate" value="0" min="0" step="0.1" inputmode="decimal">
+        </div>
+        <div class="totals-line"><span>Tax Amount</span><span class="val mono" id="taxAmount">$0.00</span></div>
+        <div class="totals-line grand"><span>Grand Total</span><span class="val mono" id="grandTotal">$0.00</span></div>
+      </div>
+
+      <label style="margin-top:16px;">Notes / Terms</label>
+      <textarea id="quoteNotes" rows="3" placeholder="Payment terms, validity period, exclusions, etc."></textarea>
+    </div>
+  </div>
+
+  <!-- 6. PRESENTED BY -->
+  <div class="card" id="sec-signoff">
+    <div class="card-head">
+      <div class="num">6</div>
+      <div>
+        <h2>Presented By</h2>
+        <div class="sub">Prepared and presented for approval</div>
+      </div>
+    </div>
+    <div class="card-body">
+
+      <h3 style="font-size:12.5px;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;">Presented By</h3>
+      <div class="field-row">
+        <div>
+          <label>Name</label>
+          <input type="text" id="presentedByName" placeholder="Full name">
+        </div>
+        <div>
+          <label>Title</label>
+          <input type="text" id="presentedByTitle" placeholder="Title / role">
+        </div>
+      </div>
+      <div class="field-row">
+        <div>
+          <label>Company</label>
+          <input type="text" id="presentedByCompany" placeholder="Company">
+        </div>
+        <div>
+          <label>Date</label>
+          <input type="date" id="presentedByDate">
+        </div>
+      </div>
+
+      <div class="sig-block">
+        <label>Signature</label>
+        <div class="sig-canvas-wrap">
+          <canvas class="sigpad" id="sigPresenter"></canvas>
+          <div class="sig-placeholder" id="sigPresenterPh">Sign here</div>
+        </div>
+        <div class="sig-tools">
+          <span class="hint">Draw with finger or stylus</span>
+          <button class="btn btn-ghost" style="min-height:34px;padding:0 12px;" id="clearPresenter">Clear</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="text-align:center;padding:10px 0 20px;color:#a7b3c6;font-size:11px;">
+    Fiber911 &middot; Project Quote Tool
+  </div>
+
+</div>
+
+<div class="print-only" id="printView"></div>
+
+<div class="bottombar">
+  <button class="btn btn-outline" id="printBtn">&#128424; Export / Print</button>
+  <button class="btn btn-orange" id="saveNowBtn">&#10003; Save</button>
+</div>
+
+<div class="sheet-backdrop" id="sheetBackdrop"></div>
+<div class="sheet" id="menuSheet">
+  <div class="grabber"></div>
+  <div class="sheet-item" id="driveStatusRow">&#9729; Google Drive: Not Connected</div>
+  <div class="sheet-item" id="sheetSaveDrive">&#9729; Save to Google Drive</div>
+  <div class="sheet-item" id="sheetOpenDrive">&#128193; Open from Google Drive</div>
+  <div class="sheet-item" id="sheetEmailPdf">&#128231; Email PDF to Customer</div>
+  <div class="sheet-item" id="sheetPrint">&#128424; Export / Print</div>
+  <div class="sheet-item" id="sheetNew">&#128203; New Blank Quote</div>
+  <div class="sheet-item danger" id="sheetReset">&#128465; Clear This Quote</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="sheet-backdrop" id="openBackdrop"></div>
+<div class="sheet" id="openSheet" style="max-height:72vh;overflow-y:auto;">
+  <div class="grabber"></div>
+  <div style="padding:2px 6px 12px;font-family:'Sora';font-weight:700;color:var(--navy);font-size:14.5px;">Open from Google Drive</div>
+  <div id="openList"></div>
+  <div class="sheet-item" id="openCancel" style="text-align:center;color:#8b98ac;">Cancel</div>
+</div>
+
+<div class="sheet-backdrop" id="priceListBackdrop"></div>
+<div class="sheet" id="priceListSheet" style="max-height:78vh;overflow-y:auto;">
+  <div class="grabber"></div>
+  <div style="padding:2px 6px 2px;font-family:'Sora';font-weight:700;color:var(--navy);font-size:14.5px;" id="priceListTitle">Price List</div>
+  <div style="padding:0 6px 10px;font-size:11px;color:#8b98ac;" id="priceListSub"></div>
+  <input type="text" id="priceListSearch" placeholder="Search item description or ID\u2026" style="margin:0 6px 10px;width:calc(100% - 12px);">
+  <div id="priceListItems"></div>
+  <div class="sheet-item" id="priceListCancel" style="text-align:center;color:#8b98ac;">Cancel</div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* =========================================================
+     GOOGLE DRIVE / SHEETS CONFIG
+     ---------------------------------------------------------
+     1. Go to https://console.cloud.google.com/ and create (or
+        pick) a project.
+     2. APIs & Services > Library > enable "Google Drive API"
+        and "Google Sheets API".
+     3. APIs & Services > OAuth consent screen: set up as
+        "External" (or Internal if using Workspace), add your
+        email as a test user if still in testing mode.
+     4. APIs & Services > Credentials > Create Credentials >
+        OAuth client ID > Application type "Web application".
+        Under "Authorized JavaScript origins" add the exact
+        origin this file is hosted on, e.g.
+        https://app.zapado.ai (no trailing slash, no path).
+     5. Copy the generated Client ID (ends in
+        .apps.googleusercontent.com) and paste it below.
+     Nothing uploads to Drive until a person taps "Connect
+     Google Drive" and signs in with their own Google account —
+     this never runs automatically for site visitors.
+     ========================================================= */
+  var GOOGLE_CLIENT_ID = "YOUR_CLIENT_ID_HERE.apps.googleusercontent.com";
+  var DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets";
+  var DRIVE_FOLDER_NAME = "Fiber911 Quotes";
+  var SHEET_TITLE = "Project Quotes";
+
+  /* =========================================================
+     CONTRACT PRICE LIST
+     Embedded from the City of Arlington Cable Installation
+     Contract 2026-2029 (26-0177). Used by the Add from Price
+     List picker in the Labor & Material Quote section.
+     ========================================================= */
+  var PRICE_LIST_TITLE = "City of Arlington Cable Installation Contract 2026-2029";
+  var PRICE_LIST_CONTRACT = "26-0177";
+  var PRICE_LIST = [
+    {id:1,cls:"UG",desc:"Directional bore and install 1.5\u201d HDPE pipe - 36\" cover",unit:"LF",rate:17.5},
+    {id:2,cls:"UG",desc:"Machine trench and install 1.5\u201d HDPE pipe - 36\" cover",unit:"LF",rate:8},
+    {id:3,cls:"UG",desc:"Hand Trench and install 1.5\u201d HDPE pipe - 36\" cover",unit:"LF",rate:8},
+    {id:4,cls:"UG",desc:"Install \"Type A\" or \u201cType C\u201d ground box with concrete apron per specifications",unit:"EA",rate:400},
+    {id:5,cls:"UG",desc:"Locate and break into existing conduit; estimate 36\u201d depth",unit:"EA",rate:350},
+    {id:6,cls:"UG",desc:"Miscellaneous underground installation of Communication Infrastructure. Example: potholing; concrete cut; identifying conduit damage",unit:"HR",rate:55},
+    {id:7,cls:"UG",desc:"Validate condition of unoccupied conduit, install traceable mule tape",unit:"LF",rate:1.25},
+    {id:8,cls:"UG",desc:"Install Fiber Optic Cable (6-48 fibers, tight-buffered and loose-tube) in unoccupied conduit with traceable mule tape (1 inch to 4 inch).",unit:"LF",rate:1.25},
+    {id:9,cls:"UG",desc:"Validate condition of conduit, prepare and install of Fiber Optic Cable (6-48 fibers, tight-buffered and loose-tube) in occupied conduit (1.5 - 4 inch). Note: If using existing fiber to pull in new conduit, no additional charge is allowed for removal of existing\\damaged cable",unit:"LF",rate:1.5},
+    {id:10,cls:"UG",desc:"Install copper or aluminum electrical conductor, in unoccupied conduit (1 inch to 4 inch). Note: price per cable, per foot; materials to be supplied by CITY Traffic Department",unit:"LF",rate:1.5},
+    {id:11,cls:"UG",desc:"Validate condition of conduit, prepare, and install copper or aluminum electrical conductor, in occupied conduit (1 inch to 4 inch). Note: price per cable, per foot; materials to be supplied by CITY Traffic Department",unit:"LF",rate:1.5},
+    {id:12,cls:"UG",desc:"Miscellaneous demo of underground cabling",unit:"HR",rate:55},
+    {id:13,cls:"UG",desc:"Install anchor and down-guy",unit:"EA",rate:100},
+    {id:14,cls:"AERIAL",desc:"Install 1-inch HDPE Riser; from base of pole to install height. Note: HDPE riser should be similar color to pole as to not contrast",unit:"EA",rate:100},
+    {id:15,cls:"AERIAL",desc:"Installation of .25-inch steel messenger stranded hardware, including all pole framing; Lash Fiber Optic Cable (6-48 fibers, tight-buffered and loose-tube) to. 25-inch steel messenger; install shoe as needed",unit:"LF",rate:2.5},
+    {id:16,cls:"AERIAL",desc:"De-lash of Fiber Optic Cable (6-48 fibers, tight-buffered and loose-tube) to existing .25-inch steel strand. Remove cable",unit:"LF",rate:1.5},
+    {id:17,cls:"AERIAL",desc:"Install and lash of Fiber Optic Cable (6-48 fibers, tight-buffered and loose-tube) to existing .25-inch steel strand.",unit:"LF",rate:2},
+    {id:18,cls:"AERIAL",desc:"Wreck-out/remove existing aerial fiber or multi-conductor copper cable and strand.",unit:"LF",rate:1.5},
+    {id:19,cls:"AERIAL",desc:"Miscellaneous Aerial installation of Communication Infrastructure Equipment",unit:"HR",rate:125},
+    {id:20,cls:"ACT",desc:"Install Unicam mechanical connector on multi-mode and single-mode Fiber Optic Cable (per fiber) (6-48 fibers, tight-buffered and loose-tube) per specifications, includes all cable cleaning and preparation.",unit:"EA",rate:35},
+    {id:21,cls:"ACT",desc:"Fusion Splice multi-mode and single-mode Fiber Optic Cable (per fiber) (6-48 fibers, tight-buffered and loose-tube) per specifications, includes all cable cleaning, preparation, installation of splice sleeve, and placement of fibers in splice tray.",unit:"EA",rate:35},
+    {id:22,cls:"ACT",desc:"Install splice closure and fiber storage (Aerial or U/G)",unit:"EA",rate:150},
+    {id:23,cls:"ACT",desc:"Install large fiber patch panel (24-72 fiber strand) in network cabinet w/multiple pigtails",unit:"EA",rate:150},
+    {id:24,cls:"ACT",desc:"Install small fiber patch panel (2-12 fiber strand) in network cabinet w/pigtail",unit:"EA",rate:75},
+    {id:25,cls:"ACT",desc:"Install LC cartridge and enclosure in network cabinet\\rack",unit:"EA",rate:75},
+    {id:26,cls:"ACT",desc:"Fiber Optic network trouble\u2013shooting and repair. OTDR, certification, etc.",unit:"HR",rate:120},
+    {id:27,cls:"ACT",desc:"Misc. Hours for mapping of fiber network and design consulting",unit:"HR",rate:100},
+    {id:28,cls:"LOCATE",desc:"Locator Per hr. \"includes man equipment and vehicle 2 hr min\"",unit:"hr",rate:100}
+  ];
+
+  var STORAGE_KEY = "fiberQuote_v1";
+  var state = {
+    company: {name:"",quoteNumber:"",date:"",address:"",custName:"",custCompany:"",custPhone:"",custEmail:"",preparedBy:""},
+    companyLogo:null, customerLogo:null,
+    scope:"", objective:"",
+    mapImages:[],
+    labor:[], material:[],
+    taxRate:0, notes:"",
+    presenter:{name:"",title:"",company:"",date:""},
+    sigPresenterData:null,
+    driveFileId:null
+  };
+
+  var $ = function(id){ return document.getElementById(id); };
+
+  /* ---------- Toast ---------- */
+  var toastEl = $("toast");
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    clearTimeout(toastEl._t);
+    toastEl._t = setTimeout(function(){ toastEl.classList.remove("show"); }, 1600);
+  }
+
+  /* ---------- Autosave ---------- */
+  var savePill = $("savePill"), saveText = $("saveText");
+  var saveTimer = null;
+  function markDirty(){
+    saveText.textContent = "Saving...";
+    savePill.classList.add("saving");
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(doSave, 500);
+  }
+  function doSave(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      saveText.textContent = "Saved";
+      savePill.classList.remove("saving");
+    }catch(e){
+      saveText.textContent = "Save failed";
+      console.error(e);
+    }
+  }
+  function loadState(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        var parsed = JSON.parse(raw);
+        state = Object.assign(state, parsed);
+      }
+    }catch(e){ console.error(e); }
+  }
+
+  /* ---------- Image compression ---------- */
+  function compressImage(file, maxDim, quality, cb){
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var img = new Image();
+      img.onload = function(){
+        var w = img.width, h = img.height;
+        if(w > h && w > maxDim){ h = Math.round(h * maxDim / w); w = maxDim; }
+        else if(h > maxDim){ w = Math.round(w * maxDim / h); h = maxDim; }
+        var canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        var ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0,0,w,h);
+        ctx.drawImage(img,0,0,w,h);
+        cb(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  /* ---------- Field binding helper ---------- */
+  function bindText(id, getPath, setPath){
+    var el = $(id);
+    el.addEventListener("input", function(){
+      setPath(el.value);
+      markDirty();
+    });
+  }
+  function applyVal(id, val){ if(val !== undefined && val !== null) $(id).value = val; }
+
+  /* ================= HEADER ================= */
+  bindText("projectName", null, function(v){ state.company.name = v; });
+  bindText("quoteNumber", null, function(v){ state.company.quoteNumber = v; });
+  bindText("quoteDate", null, function(v){ state.company.date = v; });
+  bindText("projectAddress", null, function(v){ state.company.address = v; });
+  bindText("customerName", null, function(v){ state.company.custName = v; });
+  bindText("customerCompany", null, function(v){ state.company.custCompany = v; });
+  bindText("customerPhone", null, function(v){ state.company.custPhone = v; });
+  bindText("customerEmail", null, function(v){ state.company.custEmail = v; });
+  bindText("preparedBy", null, function(v){ state.company.preparedBy = v; });
+
+  function renderHeaderFields(){
+    applyVal("projectName", state.company.name);
+    applyVal("quoteNumber", state.company.quoteNumber);
+    applyVal("quoteDate", state.company.date);
+    applyVal("projectAddress", state.company.address);
+    applyVal("customerName", state.company.custName);
+    applyVal("customerCompany", state.company.custCompany);
+    applyVal("customerPhone", state.company.custPhone);
+    applyVal("customerEmail", state.company.custEmail);
+    applyVal("preparedBy", state.company.preparedBy);
+  }
+
+  /* Logo slots */
+  function setupLogoSlot(slotId, inputId, stateKey){
+    var slot = $(slotId), input = $(inputId);
+    slot.addEventListener("click", function(e){
+      if(e.target.classList.contains("remove-x")) return;
+      input.click();
+    });
+    input.addEventListener("change", function(){
+      var file = input.files[0];
+      if(!file) return;
+      compressImage(file, 500, 0.85, function(dataUrl){
+        state[stateKey] = dataUrl;
+        renderLogo(slotId, stateKey);
+        markDirty();
+      });
+      input.value = "";
+    });
+    slot.querySelector(".remove-x").addEventListener("click", function(e){
+      e.stopPropagation();
+      state[stateKey] = null;
+      renderLogo(slotId, stateKey);
+      markDirty();
+    });
+  }
+  function renderLogo(slotId, stateKey){
+    var slot = $(slotId);
+    var existingImg = slot.querySelector("img");
+    if(state[stateKey]){
+      if(!existingImg){
+        existingImg = document.createElement("img");
+        slot.insertBefore(existingImg, slot.firstChild);
+      }
+      existingImg.src = state[stateKey];
+      slot.classList.add("has-img");
+    } else {
+      if(existingImg) existingImg.remove();
+      slot.classList.remove("has-img");
+    }
+  }
+  setupLogoSlot("companyLogoSlot","companyLogoInput","companyLogo");
+  setupLogoSlot("customerLogoSlot","customerLogoInput","customerLogo");
+
+  /* ================= SCOPE / OBJECTIVE ================= */
+  function autoExpand(textarea){
+    textarea.style.height = "auto";
+    textarea.style.height = textarea.scrollHeight + "px";
+  }
+  var scopeTextarea = $("scopeText");
+  scopeTextarea.addEventListener("input", function(){
+    state.scope = this.value;
+    autoExpand(scopeTextarea);
+    markDirty();
+  });
+  $("objectiveText").addEventListener("input", function(){ state.objective = this.value; markDirty(); });
+
+  /* ================= MAP ================= */
+  var mapGrid = $("mapGrid"), mapEmpty = $("mapEmpty");
+  $("mapCameraBtn").addEventListener("click", function(){ $("mapCameraInput").click(); });
+  $("mapLibraryBtn").addEventListener("click", function(){ $("mapLibraryInput").click(); });
+
+  function handleMapFiles(fileList){
+    var files = Array.prototype.slice.call(fileList);
+    if(!files.length) return;
+    var remaining = files.length;
+    files.forEach(function(file){
+      compressImage(file, 1280, 0.75, function(dataUrl){
+        state.mapImages.push(dataUrl);
+        remaining--;
+        if(remaining === 0){ renderMapGrid(); markDirty(); }
+      });
+    });
+  }
+  $("mapCameraInput").addEventListener("change", function(){
+    handleMapFiles(this.files); this.value = "";
+  });
+  $("mapLibraryInput").addEventListener("change", function(){
+    handleMapFiles(this.files); this.value = "";
+  });
+
+  function renderMapGrid(){
+    mapGrid.innerHTML = "";
+    if(!state.mapImages.length){
+      mapEmpty.style.display = "block";
+      return;
+    }
+    mapEmpty.style.display = "none";
+    state.mapImages.forEach(function(src, idx){
+      var thumb = document.createElement("div");
+      thumb.className = "map-thumb";
+      var img = document.createElement("img");
+      img.src = src;
+      var rm = document.createElement("div");
+      rm.className = "rm";
+      rm.textContent = "\u00d7";
+      rm.addEventListener("click", function(){
+        state.mapImages.splice(idx,1);
+        renderMapGrid();
+        markDirty();
+      });
+      thumb.appendChild(img);
+      thumb.appendChild(rm);
+      mapGrid.appendChild(thumb);
+    });
+  }
+
+  /* ================= LABOR / MATERIAL ================= */
+  var laborList = $("laborList"), materialList = $("materialList");
+
+  function money(n){
+    n = isNaN(n) ? 0 : n;
+    return "$" + n.toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+
+  function makeLineItem(list, key, item, unitLabel){
+    var row = document.createElement("div");
+    row.className = "line-item";
+
+    var top = document.createElement("div");
+    top.className = "li-top";
+    var descInput = document.createElement("input");
+    descInput.type = "text";
+    descInput.placeholder = key === "labor" ? "Task description (e.g. Splicing crew)" : "Material description (e.g. 288ct fiber cable)";
+    descInput.value = item.desc || "";
+    var del = document.createElement("div");
+    del.className = "li-del";
+    del.textContent = "\u00d7";
+    top.appendChild(descInput);
+    top.appendChild(del);
+
+    var nums = document.createElement("div");
+    nums.className = "li-nums";
+
+    var qtyWrap = document.createElement("div"); qtyWrap.className="field";
+    var qtyLabel = document.createElement("label"); qtyLabel.textContent = unitLabel;
+    var qtyInput = document.createElement("input");
+    qtyInput.type="number"; qtyInput.inputMode="decimal"; qtyInput.step="0.01"; qtyInput.min="0";
+    qtyInput.value = item.qty != null ? item.qty : "";
+    qtyWrap.appendChild(qtyLabel); qtyWrap.appendChild(qtyInput);
+
+    var rateWrap = document.createElement("div"); rateWrap.className="field";
+    var rateLabel = document.createElement("label"); rateLabel.textContent = key==="labor" ? "Rate" : "Unit Cost";
+    var rateInput = document.createElement("input");
+    rateInput.type="number"; rateInput.inputMode="decimal"; rateInput.step="0.01"; rateInput.min="0";
+    rateInput.value = item.rate != null ? item.rate : "";
+    rateWrap.appendChild(rateLabel); rateWrap.appendChild(rateInput);
+
+    var totalWrap = document.createElement("div"); totalWrap.className="field";
+    var totalLabel = document.createElement("label"); totalLabel.textContent = "Total";
+    var totalDisplay = document.createElement("div");
+    totalDisplay.className = "li-total";
+    totalWrap.appendChild(totalLabel); totalWrap.appendChild(totalDisplay);
+
+    nums.appendChild(qtyWrap); nums.appendChild(rateWrap); nums.appendChild(totalWrap);
+
+    row.appendChild(top);
+    row.appendChild(nums);
+
+    function recalc(){
+      var q = parseFloat(qtyInput.value) || 0;
+      var r = parseFloat(rateInput.value) || 0;
+      item.total = q * r;
+      totalDisplay.textContent = money(item.total);
+      updateTotals();
+    }
+
+    descInput.addEventListener("input", function(){ item.desc = descInput.value; markDirty(); });
+    qtyInput.addEventListener("input", function(){ item.qty = qtyInput.value===""?null:parseFloat(qtyInput.value); recalc(); markDirty(); });
+    rateInput.addEventListener("input", function(){ item.rate = rateInput.value===""?null:parseFloat(rateInput.value); recalc(); markDirty(); });
+    del.addEventListener("click", function(){
+      var arr = key==="labor" ? state.labor : state.material;
+      var i = arr.indexOf(item);
+      if(i>-1) arr.splice(i,1);
+      row.remove();
+      updateTotals();
+      markDirty();
+    });
+
+    recalc();
+    list.appendChild(row);
+  }
+
+  function renderLineItems(){
+    laborList.innerHTML = "";
+    materialList.innerHTML = "";
+    state.labor.forEach(function(item){ makeLineItem(laborList, "labor", item, "Quantity"); });
+    state.material.forEach(function(item){ makeLineItem(materialList, "material", item, "Qty"); });
+    updateTotals();
+  }
+
+  $("addLaborBtn").addEventListener("click", function(){
+    var item = {desc:"", qty:null, rate:null, total:0};
+    state.labor.push(item);
+    makeLineItem(laborList, "labor", item, "Quantity");
+    markDirty();
+  });
+  $("addMaterialBtn").addEventListener("click", function(){
+    var item = {desc:"", qty:null, rate:null, total:0};
+    state.material.push(item);
+    makeLineItem(materialList, "material", item, "Qty");
+    markDirty();
+  });
+
+  /* ---------- Price List picker ---------- */
+  var plBackdrop = $("priceListBackdrop"), plSheet = $("priceListSheet"), plItemsEl = $("priceListItems");
+  $("priceListTitle").textContent = PRICE_LIST_TITLE;
+  $("priceListSub").textContent = "Contract " + PRICE_LIST_CONTRACT;
+
+  function openPriceList(){ plBackdrop.classList.add("open"); plSheet.classList.add("open"); renderPriceListItems(""); }
+  function closePriceList(){ plBackdrop.classList.remove("open"); plSheet.classList.remove("open"); $("priceListSearch").value = ""; }
+  plBackdrop.addEventListener("click", closePriceList);
+  $("priceListCancel").addEventListener("click", closePriceList);
+  $("priceListBtn").addEventListener("click", openPriceList);
+  $("priceListSearch").addEventListener("input", function(){ renderPriceListItems(this.value); });
+
+  function renderPriceListItems(filterText){
+    var q = (filterText || "").trim().toLowerCase();
+    var filtered = PRICE_LIST.filter(function(it){
+      if(!q) return true;
+      return (it.desc.toLowerCase().indexOf(q) > -1) || String(it.id).indexOf(q) > -1 || it.cls.toLowerCase().indexOf(q) > -1;
+    });
+    plItemsEl.innerHTML = "";
+    if(!filtered.length){
+      plItemsEl.innerHTML = '<div class="open-empty">No matching items.</div>';
+      return;
+    }
+    var lastCls = null;
+    filtered.forEach(function(it){
+      if(it.cls !== lastCls){
+        var label = document.createElement("div");
+        label.className = "pl-group-label";
+        label.textContent = it.cls;
+        plItemsEl.appendChild(label);
+        lastCls = it.cls;
+      }
+      var row = document.createElement("div");
+      row.className = "pl-row";
+      var desc = document.createElement("div");
+      desc.className = "pl-desc";
+      desc.innerHTML = '<span class="pl-id">#'+it.id+'</span>' + escapeHtml(it.desc);
+      var rate = document.createElement("div");
+      rate.className = "pl-rate";
+      rate.innerHTML = money(it.rate) + '<span class="unit">/ ' + it.unit + '</span>';
+      row.appendChild(desc);
+      row.appendChild(rate);
+      row.addEventListener("click", function(){ addPriceListItem(it); });
+      plItemsEl.appendChild(row);
+    });
+  }
+
+  function addPriceListItem(it){
+    var item = { desc: it.desc, qty: 1, rate: it.rate, total: it.rate };
+    var isLabor = it.unit.toUpperCase() === "HR";
+    if(isLabor){
+      state.labor.push(item);
+      makeLineItem(laborList, "labor", item, "Quantity");
+    } else {
+      state.material.push(item);
+      makeLineItem(materialList, "material", item, "Qty");
+    }
+    markDirty();
+    closePriceList();
+    toast("Added: " + (it.desc.length > 40 ? it.desc.slice(0,40)+"\u2026" : it.desc));
+    var target = document.getElementById(isLabor ? "laborList" : "materialList");
+    if(target && target.lastChild) target.lastChild.scrollIntoView({behavior:"smooth", block:"center"});
+  }
+
+  var taxRateInput = $("taxRate");
+  taxRateInput.addEventListener("input", function(){
+    state.taxRate = parseFloat(taxRateInput.value) || 0;
+    updateTotals();
+    markDirty();
+  });
+  $("quoteNotes").addEventListener("input", function(){ state.notes = this.value; markDirty(); });
+
+  function computeTotals(){
+    var laborSub = state.labor.reduce(function(s,i){ return s + (i.total||0); }, 0);
+    var matSub = state.material.reduce(function(s,i){ return s + (i.total||0); }, 0);
+    var rate = parseFloat(taxRateInput.value) || 0;
+    var tax = (laborSub + matSub) * (rate / 100);
+    var grand = laborSub + matSub + tax;
+    return {laborSub:laborSub, matSub:matSub, tax:tax, grand:grand, rate:rate};
+  }
+
+  function updateTotals(){
+    var t = computeTotals();
+    $("laborSubtotal").textContent = money(t.laborSub);
+    $("materialSubtotal").textContent = money(t.matSub);
+    $("taxAmount").textContent = money(t.tax);
+    $("grandTotal").textContent = money(t.grand);
+  }
+
+  /* ================= PRINT VIEW ================= */
+  function escapeHtml(str){
+    if(str === null || str === undefined) return "";
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+  function fmtDate(d){
+    if(!d) return "";
+    var parts = d.split("-");
+    if(parts.length !== 3) return escapeHtml(d);
+    var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    var m = parseInt(parts[1],10)-1;
+    return (months[m]||"") + " " + parseInt(parts[2],10) + ", " + parts[0];
+  }
+
+  function buildPrintView(){
+    var t = computeTotals();
+    var c = state.company;
+    var html = "";
+
+    html += '<div class="pv-page">';
+
+    /* Header */
+    html += '<div class="pv-header">';
+    html += '<div class="pv-logo-block">';
+    if(state.companyLogo) html += '<img class="pv-logo-img" src="'+state.companyLogo+'">';
+    html += '<div class="pv-company-name">'+escapeHtml(c.preparedBy || "")+'</div>';
+    html += '</div>';
+    html += '<div class="pv-title-block">';
+    html += '<h1>Project Quote</h1>';
+    html += '<div class="pv-meta">';
+    if(c.quoteNumber) html += '<b>Quote #</b> '+escapeHtml(c.quoteNumber)+'<br>';
+    if(c.date) html += '<b>Date</b> '+fmtDate(c.date);
+    html += '</div></div>';
+    html += '</div>';
+
+    /* Parties */
+    html += '<div class="pv-parties">';
+    html += '<div class="pv-party"><h4>Project</h4>';
+    html += '<p><b>'+escapeHtml(c.name || "Untitled Project")+'</b></p>';
+    if(c.address) html += '<p>'+escapeHtml(c.address)+'</p>';
+    html += '</div>';
+    html += '<div class="pv-party">';
+    html += '<div class="pv-party-top">';
+    if(state.customerLogo) html += '<img src="'+state.customerLogo+'">';
+    html += '<h4 style="margin:0;">Customer</h4>';
+    html += '</div>';
+    if(c.custCompany) html += '<p><b>'+escapeHtml(c.custCompany)+'</b></p>';
+    if(c.custName) html += '<p>'+escapeHtml(c.custName)+'</p>';
+    if(c.custPhone) html += '<p>'+escapeHtml(c.custPhone)+'</p>';
+    if(c.custEmail) html += '<p>'+escapeHtml(c.custEmail)+'</p>';
+    html += '</div>';
+    html += '</div>';
+
+    /* Scope */
+    if(state.scope && state.scope.trim()){
+      html += '<div class="pv-section"><h3>Scope of Work</h3><p class="pv-body-text">'+escapeHtml(state.scope)+'</p></div>';
+    }
+
+    /* Objective */
+    if(state.objective && state.objective.trim()){
+      html += '<div class="pv-section"><h3>Project Objective</h3>';
+      html += '<p class="pv-body-text">'+escapeHtml(state.objective)+'</p>';
+      html += '</div>';
+    }
+
+    /* Map */
+    if(state.mapImages && state.mapImages.length){
+      html += '<div class="pv-section"><h3>Project Map</h3><div class="pv-map-grid">';
+      state.mapImages.forEach(function(src){ html += '<img src="'+src+'">'; });
+      html += '</div></div>';
+    }
+
+    /* Quote */
+    html += '<div class="pv-section"><h3>Labor &amp; Material Quote</h3>';
+    if(state.labor.length){
+      html += '<div class="pv-subgroup-label">Labor</div>';
+      html += '<table class="pv-table"><thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Total</th></tr></thead><tbody>';
+      state.labor.forEach(function(i){
+        html += '<tr><td>'+escapeHtml(i.desc||"")+'</td><td class="num">'+(i.qty!=null?i.qty:"")+'</td><td class="num">'+(i.rate!=null?money(i.rate):"")+'</td><td class="num">'+money(i.total||0)+'</td></tr>';
+      });
+      html += '</tbody></table>';
+    }
+    if(state.material.length){
+      html += '<div class="pv-subgroup-label">Materials</div>';
+      html += '<table class="pv-table"><thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Unit Cost</th><th class="num">Total</th></tr></thead><tbody>';
+      state.material.forEach(function(i){
+        html += '<tr><td>'+escapeHtml(i.desc||"")+'</td><td class="num">'+(i.qty!=null?i.qty:"")+'</td><td class="num">'+(i.rate!=null?money(i.rate):"")+'</td><td class="num">'+money(i.total||0)+'</td></tr>';
+      });
+      html += '</tbody></table>';
+    }
+    html += '<div class="pv-totals">';
+    html += '<div class="tline"><span>Labor Subtotal</span><span class="val">'+money(t.laborSub)+'</span></div>';
+    html += '<div class="tline"><span>Materials Subtotal</span><span class="val">'+money(t.matSub)+'</span></div>';
+    html += '<div class="tline"><span>Tax ('+ (t.rate||0) +'%)</span><span class="val">'+money(t.tax)+'</span></div>';
+    html += '<div class="grand"><span>Total</span><span>'+money(t.grand)+'</span></div>';
+    html += '</div>';
+    if(state.notes && state.notes.trim()){
+      html += '<div class="pv-notes">'+escapeHtml(state.notes)+'</div>';
+    }
+    html += '</div>';
+
+    /* Presented by */
+    html += '<div class="pv-section"><h3>Presented By</h3><div class="pv-sign-grid"><div class="pv-sign-box">';
+    if(state.sigPresenterData){
+      html += '<img class="pv-sign-img" src="'+state.sigPresenterData+'">';
+    } else {
+      html += '<div class="pv-sign-line"></div>';
+    }
+    html += '<div class="pv-sign-name">'+escapeHtml(state.presenter.name || "")+'</div>';
+    var subBits = [];
+    if(state.presenter.title) subBits.push(escapeHtml(state.presenter.title));
+    if(state.presenter.company) subBits.push(escapeHtml(state.presenter.company));
+    if(subBits.length) html += '<div class="pv-sign-sub">'+subBits.join(" &middot; ")+'</div>';
+    html += '<div class="pv-sign-label">Signature'+(state.presenter.date ? " &middot; "+fmtDate(state.presenter.date) : "")+'</div>';
+    html += '</div><div class="pv-sign-box"></div></div></div>';
+
+    /* Footer */
+    html += '<div class="pv-footer"><span>Fiber911 &middot; Project Quote Tool</span><span>Generated '+fmtDate(new Date().toISOString().slice(0,10))+'</span></div>';
+
+    html += '</div>';
+
+    $("printView").innerHTML = html;
+  }
+  window.addEventListener("beforeprint", buildPrintView);
+
+  /* ================= SCRIPT LOADER ================= */
+  var loadedScripts = {};
+  function loadScript(src){
+    if(loadedScripts[src]) return loadedScripts[src];
+    loadedScripts[src] = new Promise(function(resolve, reject){
+      var s = document.createElement("script");
+      s.src = src;
+      s.onload = function(){ resolve(); };
+      s.onerror = function(){ reject(new Error("Failed to load " + src)); };
+      document.head.appendChild(s);
+    });
+    return loadedScripts[src];
+  }
+
+  /* ================= GOOGLE DRIVE / SHEETS ================= */
+  var DRIVE_META_KEY = "fiberQuoteDriveMeta_v1";
+  var driveMeta = {folderId:null, sheetId:null};
+  (function loadDriveMeta(){
+    try{
+      var raw = localStorage.getItem(DRIVE_META_KEY);
+      if(raw) driveMeta = Object.assign(driveMeta, JSON.parse(raw));
+    }catch(e){}
+  })();
+  function saveDriveMeta(){
+    try{ localStorage.setItem(DRIVE_META_KEY, JSON.stringify(driveMeta)); }catch(e){}
+  }
+
+  var driveState = { accessToken:null, expiresAt:0, email:null, tokenClient:null };
+  var driveConfigured = GOOGLE_CLIENT_ID.indexOf("YOUR_CLIENT_ID_HERE") === -1;
+
+  function isDriveConnected(){
+    return !!(driveState.accessToken && Date.now() < driveState.expiresAt);
+  }
+
+  function updateDriveMenuUI(){
+    var row = $("driveStatusRow");
+    if(!driveConfigured){
+      row.textContent = "\u2601 Google Drive: not set up (see file config)";
+      row.className = "sheet-item muted";
+    } else if(isDriveConnected()){
+      row.textContent = "\u2601 Google Drive: Connected" + (driveState.email ? " (" + driveState.email + ")" : "");
+      row.className = "sheet-item connected";
+    } else {
+      row.textContent = "\u2601 Google Drive: Not Connected \u2014 tap to connect";
+      row.className = "sheet-item";
+    }
+  }
+
+  function ensureTokenClient(){
+    return loadScript("https://accounts.google.com/gsi/client").then(function(){
+      if(!driveState.tokenClient){
+        driveState.tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_CLIENT_ID,
+          scope: DRIVE_SCOPES,
+          callback: function(){}
+        });
+      }
+      return driveState.tokenClient;
+    });
+  }
+
+  function connectDrive(){
+    return new Promise(function(resolve, reject){
+      if(!driveConfigured){
+        toast("Add your Google Client ID in the file config first");
+        reject(new Error("not configured"));
+        return;
+      }
+      ensureTokenClient().then(function(client){
+        client.callback = function(resp){
+          if(resp.error){ reject(resp); return; }
+          driveState.accessToken = resp.access_token;
+          driveState.expiresAt = Date.now() + (parseInt(resp.expires_in,10) - 60) * 1000;
+          fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+            headers: { Authorization: "Bearer " + driveState.accessToken }
+          }).then(function(r){ return r.json(); }).then(function(info){
+            driveState.email = info.email || null;
+            updateDriveMenuUI();
+            resolve();
+          }).catch(function(){ updateDriveMenuUI(); resolve(); });
+        };
+        client.requestAccessToken({ prompt: isDriveConnected() ? "" : "consent" });
+      }).catch(reject);
+    });
+  }
+
+  function disconnectDrive(){
+    if(driveState.accessToken && window.google && google.accounts && google.accounts.oauth2){
+      google.accounts.oauth2.revoke(driveState.accessToken, function(){});
+    }
+    driveState.accessToken = null;
+    driveState.expiresAt = 0;
+    driveState.email = null;
+    updateDriveMenuUI();
+    toast("Disconnected from Google Drive");
+  }
+
+  function driveFetch(url, options){
+    options = options || {};
+    options.headers = Object.assign({ Authorization: "Bearer " + driveState.accessToken }, options.headers || {});
+    return fetch(url, options).then(function(r){
+      if(!r.ok){ return r.text().then(function(t){ throw new Error("Drive API error " + r.status + ": " + t); }); }
+      return r.status === 204 ? null : r.json();
+    });
+  }
+
+  function ensureFolder(){
+    if(driveMeta.folderId) return Promise.resolve(driveMeta.folderId);
+    var q = encodeURIComponent("name='" + DRIVE_FOLDER_NAME + "' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+    return driveFetch("https://www.googleapis.com/drive/v3/files?q=" + q + "&fields=files(id,name)")
+      .then(function(res){
+        if(res.files && res.files.length){ return res.files[0].id; }
+        return driveFetch("https://www.googleapis.com/drive/v3/files", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: DRIVE_FOLDER_NAME, mimeType: "application/vnd.google-apps.folder" })
+        }).then(function(f){ return f.id; });
+      })
+      .then(function(id){ driveMeta.folderId = id; saveDriveMeta(); return id; });
+  }
+
+  var SHEET_HEADERS = ["Date","Quote #","Project Name","Customer","Customer Company","Grand Total","Drive File Link"];
+
+  function ensureSheet(folderId){
+    if(driveMeta.sheetId) return Promise.resolve(driveMeta.sheetId);
+    var q = encodeURIComponent("name='" + SHEET_TITLE + "' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false and '" + folderId + "' in parents");
+    return driveFetch("https://www.googleapis.com/drive/v3/files?q=" + q + "&fields=files(id,name)")
+      .then(function(res){
+        if(res.files && res.files.length){ return res.files[0].id; }
+        return driveFetch("https://sheets.googleapis.com/v4/spreadsheets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ properties: { title: SHEET_TITLE }, sheets: [{ properties: { title: "Quotes" } }] })
+        }).then(function(sheet){
+          var id = sheet.spreadsheetId;
+          return driveFetch("https://sheets.googleapis.com/v4/spreadsheets/" + id + "/values/Quotes!A1:G1?valueInputOption=RAW", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ values: [SHEET_HEADERS] })
+          }).then(function(){
+            return driveFetch("https://www.googleapis.com/drive/v3/files/" + id + "?addParents=" + folderId + "&fields=id", { method: "PATCH" });
+          }).then(function(){ return id; });
+        });
+      })
+      .then(function(id){ driveMeta.sheetId = id; saveDriveMeta(); return id; });
+  }
+
+  function saveQuoteJSON(folderId){
+    var filename = (state.company.quoteNumber || "Quote") + " - " + (state.company.name || "Untitled") + ".json";
+    var payload = JSON.stringify(state);
+    var metadata = { name: filename };
+    if(!state.driveFileId) metadata.parents = [folderId];
+    var boundary = "fiberquoteboundary";
+    var body =
+      "--" + boundary + "\r\n" +
+      "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+      JSON.stringify(metadata) + "\r\n" +
+      "--" + boundary + "\r\n" +
+      "Content-Type: application/json\r\n\r\n" +
+      payload + "\r\n" +
+      "--" + boundary + "--";
+
+    var url = state.driveFileId
+      ? "https://www.googleapis.com/upload/drive/v3/files/" + state.driveFileId + "?uploadType=multipart"
+      : "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart";
+    var method = state.driveFileId ? "PATCH" : "POST";
+
+    return driveFetch(url, {
+      method: method,
+      headers: { "Content-Type": "multipart/related; boundary=" + boundary },
+      body: body
+    }).then(function(res){
+      state.driveFileId = res.id;
+      markDirty();
+      return res.id;
+    });
+  }
+
+  function upsertSheetRow(sheetId){
+    var quoteNum = state.company.quoteNumber || "";
+    var row = [
+      state.company.date || "",
+      quoteNum,
+      state.company.name || "",
+      state.company.custName || "",
+      state.company.custCompany || "",
+      money(computeTotals().grand),
+      "https://drive.google.com/file/d/" + (state.driveFileId || "")
+    ];
+    return driveFetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/Quotes!A2:A?majorDimension=COLUMNS")
+      .then(function(res){
+        var col = (res.values && res.values[0]) || [];
+        var rowIndex = -1;
+        for(var i=0;i<col.length;i++){
+          if(quoteNum && col[i] === quoteNum){ rowIndex = i; break; }
+        }
+        if(rowIndex > -1){
+          var range = "Quotes!A" + (rowIndex+2) + ":G" + (rowIndex+2);
+          return driveFetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/" + range + "?valueInputOption=RAW", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ values: [row] })
+          });
+        }
+        return driveFetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheetId + "/values/Quotes!A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ values: [row] })
+        });
+      });
+  }
+
+  function saveToGoogleDrive(){
+    var run = function(){
+      toast("Saving to Google Drive\u2026");
+      ensureFolder().then(function(folderId){
+        return saveQuoteJSON(folderId).then(function(){
+          return ensureSheet(folderId).then(function(sheetId){
+            return upsertSheetRow(sheetId);
+          });
+        });
+      }).then(function(){
+        toast("Saved to Google Drive & Project Quotes sheet");
+      }).catch(function(err){
+        console.error(err);
+        toast("Google Drive save failed \u2014 see console");
+      });
+    };
+    if(isDriveConnected()){ run(); }
+    else { connectDrive().then(run).catch(function(){}); }
+  }
+
+  $("driveStatusRow").addEventListener("click", function(){
+    if(!driveConfigured) return;
+    if(isDriveConnected()){
+      if(confirm("Disconnect this Google account from the quote tool?")) disconnectDrive();
+    } else {
+      connectDrive().catch(function(){});
+    }
+  });
+  $("sheetSaveDrive").addEventListener("click", function(){ closeSheet(); saveToGoogleDrive(); });
+  updateDriveMenuUI();
+
+  /* ---------- Open from Google Drive ---------- */
+  var openBackdrop = $("openBackdrop"), openSheetEl = $("openSheet"), openList = $("openList");
+  function openOpenSheet(){ openBackdrop.classList.add("open"); openSheetEl.classList.add("open"); }
+  function closeOpenSheet(){ openBackdrop.classList.remove("open"); openSheetEl.classList.remove("open"); }
+  openBackdrop.addEventListener("click", closeOpenSheet);
+  $("openCancel").addEventListener("click", closeOpenSheet);
+
+  function listDriveQuotes(){
+    return ensureFolder().then(function(folderId){
+      var q = encodeURIComponent("'" + folderId + "' in parents and mimeType='application/json' and trashed=false");
+      return driveFetch("https://www.googleapis.com/drive/v3/files?q=" + q + "&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc");
+    }).then(function(res){ return res.files || []; });
+  }
+
+  function renderOpenList(files){
+    openList.innerHTML = "";
+    if(!files.length){
+      openList.innerHTML = '<div class="open-empty">No saved quotes found in your Fiber911 Quotes folder yet.</div>';
+      return;
+    }
+    files.forEach(function(f){
+      var row = document.createElement("div");
+      row.className = "open-row";
+      var title = document.createElement("div");
+      title.className = "or-title";
+      title.textContent = f.name.replace(/\.json$/i, "");
+      var sub = document.createElement("div");
+      sub.className = "or-sub";
+      var d = new Date(f.modifiedTime);
+      sub.textContent = "Modified " + d.toLocaleDateString() + " " + d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+      row.appendChild(title);
+      row.appendChild(sub);
+      row.addEventListener("click", function(){ loadQuoteFromDrive(f.id); });
+      openList.appendChild(row);
+    });
+  }
+
+  function loadQuoteFromDrive(fileId){
+    if(!confirm("Load this quote? Any unsaved changes to the current quote will be lost (unless already saved).")) return;
+    closeOpenSheet();
+    toast("Loading quote\u2026");
+    driveFetch("https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media")
+      .then(function(loaded){
+        state = Object.assign({
+          company:{name:"",quoteNumber:"",date:"",address:"",custName:"",custCompany:"",custPhone:"",custEmail:"",preparedBy:""},
+          companyLogo:null, customerLogo:null, scope:"", objective:"", mapImages:[],
+          labor:[], material:[], taxRate:0, notes:"",
+          presenter:{name:"",title:"",company:"",date:""}, sigPresenterData:null, driveFileId:null
+        }, loaded);
+        hydrateUIFromState();
+        doSave();
+        toast("Quote loaded");
+      })
+      .catch(function(err){
+        console.error(err);
+        toast("Couldn't load that quote \u2014 see console");
+      });
+  }
+
+  $("sheetOpenDrive").addEventListener("click", function(){
+    closeSheet();
+    var run = function(){
+      openOpenSheet();
+      openList.innerHTML = '<div class="open-empty">Loading\u2026</div>';
+      listDriveQuotes().then(renderOpenList).catch(function(err){
+        console.error(err);
+        openList.innerHTML = '<div class="open-empty">Couldn\u2019t load your Drive files \u2014 see console.</div>';
+      });
+    };
+    if(isDriveConnected()){ run(); }
+    else { connectDrive().then(run).catch(function(){}); }
+  });
+
+  /* ================= PDF GENERATION + EMAIL ================= */
+  function generatePdfBlob(){
+    return Promise.all([
+      loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"),
+      loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js")
+    ]).then(function(){
+      buildPrintView();
+      var el = $("printView");
+      var prevStyle = el.getAttribute("style") || "";
+      el.setAttribute("style", prevStyle + ";display:block !important;position:fixed;left:-9999px;top:0;width:800px;background:#fff;padding:24px;z-index:-1;");
+      return html2canvas(el, { scale:2, useCORS:true }).then(function(canvas){
+        el.setAttribute("style", prevStyle);
+        var jsPDFCtor = window.jspdf.jsPDF;
+        var pdf = new jsPDFCtor({ unit:"pt", format:"letter" });
+        var pageW = pdf.internal.pageSize.getWidth();
+        var pageH = pdf.internal.pageSize.getHeight();
+        var imgW = pageW;
+        var imgH = canvas.height * (imgW / canvas.width);
+        var heightLeft = imgH;
+        var position = 0;
+        var imgData = canvas.toDataURL("image/jpeg", 0.92);
+        pdf.addImage(imgData, "JPEG", 0, position, imgW, imgH);
+        heightLeft -= pageH;
+        while(heightLeft > 0){
+          position = heightLeft - imgH;
+          pdf.addPage();
+          pdf.addImage(imgData, "JPEG", 0, position, imgW, imgH);
+          heightLeft -= pageH;
+        }
+        return pdf.output("blob");
+      });
+    });
+  }
+
+  function emailPdfToCustomer(){
+    toast("Generating PDF\u2026");
+    generatePdfBlob().then(function(blob){
+      var filename = (state.company.quoteNumber || "Quote") + " - " + (state.company.name || "Untitled") + ".pdf";
+      var a = document.createElement("a");
+      var url = URL.createObjectURL(blob);
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+
+      var custEmail = state.company.custEmail || "";
+      var subject = "Project Quote" + (state.company.name ? " - " + state.company.name : "");
+      var greeting = state.company.custName ? "Hi " + state.company.custName + "," : "Hi,";
+      var bodyLines = [
+        greeting,
+        "",
+        "Please find attached the project quote" + (state.company.name ? " for " + state.company.name : "") + ".",
+        "The PDF just downloaded to your device \u2014 please attach it to this email before sending.",
+        "",
+        "Total: " + money(computeTotals().grand),
+        "",
+        "Thank you,",
+        state.company.preparedBy || ""
+      ];
+      var mailto = "mailto:" + encodeURIComponent(custEmail) +
+        "?subject=" + encodeURIComponent(subject) +
+        "&body=" + encodeURIComponent(bodyLines.join("\n"));
+      toast("PDF downloaded \u2014 opening email\u2026");
+      setTimeout(function(){ window.location.href = mailto; }, 600);
+    }).catch(function(err){
+      console.error(err);
+      toast("PDF generation failed \u2014 see console");
+    });
+  }
+
+  $("sheetEmailPdf").addEventListener("click", function(){ closeSheet(); emailPdfToCustomer(); });
+
+  /* ================= PRESENTED BY ================= */
+  bindText("presentedByName", null, function(v){ state.presenter.name = v; });
+  bindText("presentedByTitle", null, function(v){ state.presenter.title = v; });
+  bindText("presentedByCompany", null, function(v){ state.presenter.company = v; });
+  bindText("presentedByDate", null, function(v){ state.presenter.date = v; });
+
+  function renderSignoffFields(){
+    applyVal("presentedByName", state.presenter.name);
+    applyVal("presentedByTitle", state.presenter.title);
+    applyVal("presentedByCompany", state.presenter.company);
+    applyVal("presentedByDate", state.presenter.date);
+  }
+
+  /* Signature pad factory */
+  function setupSigPad(canvasId, placeholderId, stateProp, clearBtnId){
+    var canvas = $(canvasId), ph = $(placeholderId);
+    var ctx = canvas.getContext("2d");
+    var drawing = false, hasInk = false;
+    var dpr = window.devicePixelRatio || 1;
+
+    function resize(){
+      var rect = canvas.getBoundingClientRect();
+      var savedData = hasInk ? canvas.toDataURL() : null;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+      ctx.lineWidth = 2.4;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = "#0b1f3a";
+      if(savedData){
+        var img = new Image();
+        img.onload = function(){ ctx.drawImage(img, 0, 0, rect.width, rect.height); };
+        img.src = savedData;
+      }
+    }
+    resize();
+    window.addEventListener("resize", resize);
+
+    function pos(e){
+      var rect = canvas.getBoundingClientRect();
+      var cx = (e.touches ? e.touches[0].clientX : e.clientX);
+      var cy = (e.touches ? e.touches[0].clientY : e.clientY);
+      return {x: cx - rect.left, y: cy - rect.top};
+    }
+    function start(e){
+      e.preventDefault();
+      drawing = true;
+      hasInk = true;
+      ph.style.display = "none";
+      var p = pos(e);
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+    }
+    function move(e){
+      if(!drawing) return;
+      e.preventDefault();
+      var p = pos(e);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+    }
+    function end(){
+      if(!drawing) return;
+      drawing = false;
+      state[stateProp] = canvas.toDataURL("image/png");
+      markDirty();
+    }
+    canvas.addEventListener("mousedown", start);
+    canvas.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", end);
+    canvas.addEventListener("touchstart", start, {passive:false});
+    canvas.addEventListener("touchmove", move, {passive:false});
+    canvas.addEventListener("touchend", end);
+
+    $(clearBtnId).addEventListener("click", function(){
+      var rect = canvas.getBoundingClientRect();
+      ctx.clearRect(0,0,rect.width,rect.height);
+      hasInk = false;
+      ph.style.display = "flex";
+      state[stateProp] = null;
+      markDirty();
+    });
+
+    return {
+      restore: function(dataUrl){
+        if(!dataUrl) return;
+        var img = new Image();
+        img.onload = function(){
+          var rect = canvas.getBoundingClientRect();
+          ctx.drawImage(img, 0, 0, rect.width, rect.height);
+          hasInk = true;
+          ph.style.display = "none";
+        };
+        img.src = dataUrl;
+      },
+      clear: function(){
+        var rect = canvas.getBoundingClientRect();
+        ctx.clearRect(0,0,rect.width,rect.height);
+        hasInk = false;
+        ph.style.display = "flex";
+      },
+      set: function(dataUrl){
+        this.clear();
+        if(dataUrl) this.restore(dataUrl);
+      }
+    };
+  }
+
+  var presenterPad;
+
+  /* ================= MENU SHEET ================= */
+  var sheetBackdrop = $("sheetBackdrop"), menuSheet = $("menuSheet");
+  function openSheet(){ sheetBackdrop.classList.add("open"); menuSheet.classList.add("open"); }
+  function closeSheet(){ sheetBackdrop.classList.remove("open"); menuSheet.classList.remove("open"); }
+  $("menuBtn").addEventListener("click", openSheet);
+  sheetBackdrop.addEventListener("click", closeSheet);
+  $("sheetPrint").addEventListener("click", function(){ closeSheet(); buildPrintView(); window.print(); });
+  $("sheetNew").addEventListener("click", function(){
+    closeSheet();
+    if(confirm("Start a new blank quote? Unsaved changes to the current quote will be lost unless already saved.")){
+      localStorage.removeItem(STORAGE_KEY);
+      location.reload();
+    }
+  });
+  $("sheetReset").addEventListener("click", function(){
+    closeSheet();
+    if(confirm("Clear all fields on this quote? This cannot be undone.")){
+      localStorage.removeItem(STORAGE_KEY);
+      location.reload();
+    }
+  });
+
+  $("printBtn").addEventListener("click", function(){ buildPrintView(); window.print(); });
+  $("saveNowBtn").addEventListener("click", function(){ doSave(); toast("Quote saved"); });
+
+  /* ================= SCROLL SPY TABS ================= */
+  var tabBtns = Array.prototype.slice.call(document.querySelectorAll(".tab-btn"));
+  var sections = tabBtns.map(function(b){ return document.getElementById(b.dataset.target); });
+
+  tabBtns.forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var target = document.getElementById(btn.dataset.target);
+      var offset = 108;
+      var top = target.getBoundingClientRect().top + window.pageYOffset - offset;
+      window.scrollTo({top: top, behavior:"smooth"});
+    });
+  });
+
+  function updateActiveTab(){
+    var scrollPos = window.pageYOffset + 130;
+    var activeIdx = 0;
+    for(var i=0;i<sections.length;i++){
+      if(sections[i].offsetTop <= scrollPos) activeIdx = i;
+    }
+    tabBtns.forEach(function(b,i){ b.classList.toggle("active", i===activeIdx); });
+  }
+  window.addEventListener("scroll", updateActiveTab, {passive:true});
+
+  /* ================= INIT ================= */
+  function hydrateUIFromState(){
+    renderHeaderFields();
+    renderLogo("companyLogoSlot","companyLogo");
+    renderLogo("customerLogoSlot","customerLogo");
+    $("scopeText").value = state.scope || "";
+    autoExpand($("scopeText"));
+    $("objectiveText").value = state.objective || "";
+    renderMapGrid();
+    renderLineItems();
+    taxRateInput.value = state.taxRate || 0;
+    $("quoteNotes").value = state.notes || "";
+    renderSignoffFields();
+    if(presenterPad) presenterPad.set(state.sigPresenterData);
+    updateActiveTab();
+  }
+
+  function init(){
+    loadState();
+    hydrateUIFromState();
+
+    presenterPad = setupSigPad("sigPresenter","sigPresenterPh","sigPresenterData","clearPresenter");
+    setTimeout(function(){
+      presenterPad.restore(state.sigPresenterData);
+    }, 60);
+
+    if(!state.company.date){ $("quoteDate").value = new Date().toISOString().slice(0,10); state.company.date = $("quoteDate").value; }
+
+    updateActiveTab();
+    saveText.textContent = "Saved";
+  }
+  document.addEventListener("DOMContentLoaded", init);
+})();
+</script>
+</body>
+</html>
