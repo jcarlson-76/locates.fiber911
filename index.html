@@ -319,6 +319,13 @@
       <div class="field" style="margin-bottom:12px;">
         <input type="text" id="activeSearchInput" placeholder="Search by ticket #, incident #, address, or permit #..." oninput="activeSearchQuery=this.value; renderActiveTable();">
       </div>
+      <div class="field" style="margin-bottom:12px;">
+        <select id="activeSortSelect" onchange="activeSortMode=this.value; renderActiveTable();">
+          <option value="recent">Sort: Most Recent</option>
+          <option value="incident-asc">Sort: Incident # (Low to High)</option>
+          <option value="incident-desc">Sort: Incident # (High to Low)</option>
+        </select>
+      </div>
       <div class="table-wrap">
         <table id="activeTable"><thead></thead><tbody></tbody></table>
       </div>
@@ -406,6 +413,13 @@
       <div class="field" style="margin-bottom:12px;">
         <input type="text" id="doneSearchInput" placeholder="Search by ticket #, incident #, invoice #, address, or completed by..." oninput="doneSearchQuery=this.value; renderDoneTable();">
       </div>
+      <div class="field" style="margin-bottom:12px;">
+        <select id="doneSortSelect" onchange="doneSortMode=this.value; renderDoneTable();">
+          <option value="recent">Sort: Most Recently Completed</option>
+          <option value="incident-asc">Sort: Incident # (Low to High)</option>
+          <option value="incident-desc">Sort: Incident # (High to Low)</option>
+        </select>
+      </div>
       <div class="table-wrap">
         <table id="doneTable"><thead></thead><tbody></tbody></table>
       </div>
@@ -480,6 +494,8 @@ let currentMapFilter = 'active'; // 'active' | '7-30' | '30+'
 let activeSearchQuery = '';
 let doneSearchQuery = '';
 let activeStatusFilter = 'open'; // 'open' | 'all' — which tickets show in the Active tab
+let activeSortMode = 'recent'; // 'recent' | 'incident-asc' | 'incident-desc'
+let doneSortMode = 'recent';
 
 function flashAutosave(){
   const el = document.getElementById('autosaveText');
@@ -1100,7 +1116,13 @@ function renderActiveTable(){
     list = list.filter(t=>[t.ticketId,t.incident,t.addrNum,t.street,t.permitNum]
       .some(v=>(v||'').toString().toLowerCase().includes(q)));
   }
-  list = list.sort((a,b)=> (b.createdAt||'').localeCompare(a.createdAt||''));
+  if(activeSortMode === 'incident-asc'){
+    list = list.sort((a,b)=> compareByIncident(a,b,'asc'));
+  } else if(activeSortMode === 'incident-desc'){
+    list = list.sort((a,b)=> compareByIncident(a,b,'desc'));
+  } else {
+    list = list.sort((a,b)=> (b.createdAt||'').localeCompare(a.createdAt||''));
+  }
   if(list.length===0){
     table.querySelector('thead').innerHTML='';
     table.querySelector('tbody').innerHTML='';
@@ -1124,6 +1146,20 @@ function renderActiveTable(){
 }
 function fmt(v){ if(!v) return '—'; return v.replace('T',' '); }
 function esc(s){ return (s||'').toString().replace(/</g,'&lt;'); }
+// Numeric value used for sorting by Incident #, or null if it's blank/non-numeric.
+function incidentSortValue(t){
+  const n = parseInt(String(t.incident||'').replace(/\D/g,''), 10);
+  return isNaN(n) ? null : n;
+}
+// Blank/non-numeric incidents always sort to the end, regardless of
+// direction — never mixed in as if they were 0 or "highest".
+function compareByIncident(a, b, dir){
+  const av = incidentSortValue(a), bv = incidentSortValue(b);
+  if(av===null && bv===null) return 0;
+  if(av===null) return 1;
+  if(bv===null) return -1;
+  return dir==='asc' ? av-bv : bv-av;
+}
 // Our Drive links are saved as "export=view" (opens inline in the browser).
 // Swapping to "export=download" forces an actual file download instead.
 function driveDownloadUrl(viewUrl){
@@ -1653,7 +1689,13 @@ function renderDoneTable(){
     list = list.filter(t=>[t.ticketId,t.incident,t.invoiceNum,t.addrNum,t.street,t.completedBy]
       .some(v=>(v||'').toString().toLowerCase().includes(q)));
   }
-  list = list.sort((a,b)=>(b.completedAt||'').localeCompare(a.completedAt||''));
+  if(doneSortMode === 'incident-asc'){
+    list = list.sort((a,b)=> compareByIncident(a,b,'asc'));
+  } else if(doneSortMode === 'incident-desc'){
+    list = list.sort((a,b)=> compareByIncident(a,b,'desc'));
+  } else {
+    list = list.sort((a,b)=>(b.completedAt||'').localeCompare(a.completedAt||''));
+  }
   if(list.length===0){
     table.querySelector('thead').innerHTML='';
     table.querySelector('tbody').innerHTML='';
