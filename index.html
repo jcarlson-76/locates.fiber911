@@ -326,6 +326,11 @@
           <option value="incident-desc">Sort: Incident # (High to Low)</option>
         </select>
       </div>
+      <div class="row-btns" id="routeBar" style="margin-bottom:10px;align-items:center;">
+        <button class="btn btn-gold" id="buildRouteBtn" onclick="openRouteModal()" disabled>Build Route (0/10)</button>
+        <button class="btn btn-ghost" onclick="clearRouteSelection()">Clear</button>
+        <span class="small-note">Tick up to 10 open locates, then build a driving route for the tech.</span>
+      </div>
       <div class="table-wrap">
         <table id="activeTable"><thead></thead><tbody></tbody></table>
       </div>
@@ -472,8 +477,34 @@ const SETTINGS_KEY = 'fiber911_locate_settings';
 function loadTickets(){
   try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }catch(e){ return []; }
 }
+// Local base64 copies of site maps are only needed until Drive has the file.
+// Once a slot has a Drive URL we drop its local copy (keeps storage small).
+function compactLocalImages(list, force){
+  let freed = 0;
+  list.forEach(t=>{
+    [1,2,3,4].forEach(slot=>{
+      const lk = siteMapSlotFieldKey(slot,'local'), uk = siteMapSlotFieldKey(slot,'url');
+      if(t[lk] && (force || (t[uk] && !/^ERROR/.test(t[uk])))){ freed += t[lk].length; t[lk] = ''; }
+    });
+  });
+  return freed;
+}
 function saveTickets(list){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  compactLocalImages(list, false);
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  }catch(e){
+    // Storage full: drop ALL local image copies (the Drive/sheet copy is the source of truth) and retry.
+    const freed = compactLocalImages(list, true);
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+      showToast('Device storage was full — removed local map copies ('+Math.round(freed/1024)+' KB). Maps still load from Drive.');
+    }catch(e2){
+      showToast('Could not save on this device (storage full). Run Sync Now, then clear site data for this app.');
+      try{ logDebug('saveTickets FAILED even after compaction: '+e2.message); }catch(_){}
+      return;
+    }
+  }
   flashAutosave();
 }
 function loadSettings(){
@@ -496,6 +527,9 @@ let doneSearchQuery = '';
 let activeStatusFilter = 'open'; // 'open' | 'all' — which tickets show in the Active tab
 let activeSortMode = 'recent'; // 'recent' | 'incident-asc' | 'incident-desc'
 let doneSortMode = 'recent';
+const ROUTE_MAX = 10;
+let selectedRouteIds = [];
+let currentRouteOrder = [];
 
 function flashAutosave(){
   const el = document.getElementById('autosaveText');
@@ -1131,9 +1165,10 @@ function renderActiveTable(){
     return;
   }
   document.getElementById('activeEmpty').style.display='none';
-  table.querySelector('thead').innerHTML = '<tr><th>Ticket</th><th>Incident</th><th>Address</th><th>Status</th><th>Map</th><th>City Recv.</th><th>We Recv.</th><th></th></tr>';
+  table.querySelector('thead').innerHTML = '<tr><th>Route</th><th>Ticket</th><th>Incident</th><th>Address</th><th>Status</th><th>Map</th><th>City Recv.</th><th>We Recv.</th><th></th></tr>';
   table.querySelector('tbody').innerHTML = list.map(t=>`
     <tr${t.emergency==='Yes' ? ' style="background:#f5ecfa;"' : ''}>
+      <td>${t.status==='open' ? `<input type="checkbox" style="width:20px;height:20px;" ${selectedRouteIds.includes(t.ticketId)?'checked':''} onchange="toggleRouteSelect('${t.ticketId}', this)">` : ''}</td>
       <td class="ticket-id">${t.ticketId}</td>
       <td>${esc(t.incident)||'—'}</td>
       <td>${esc(t.addrNum+' '+t.street)||'—'}</td>
@@ -1143,6 +1178,7 @@ function renderActiveTable(){
       <td class="mono" style="font-size:11.5px;">${fmt(t.weReceived)}</td>
       <td><button class="btn btn-ghost" style="min-height:32px;padding:0 12px;font-size:12px;" onclick="openDetail('${t.ticketId}')">View</button></td>
     </tr>`).join('');
+  updateRouteButton();
 }
 function fmt(v){ if(!v) return '—'; return v.replace('T',' '); }
 function esc(s){ return (s||'').toString().replace(/</g,'&lt;'); }
@@ -1265,6 +1301,113 @@ function openDetail(id){
   `;
   document.getElementById('detailModal').classList.add('active');
 }
+
+// ---------- ROUTE BUILDER ----------
+function updateRouteButton(){
+  selectedRouteIds = selectedRouteIds.filter(id=>{ const t=TICKETS.find(x=>x.ticketId===id); return t && t.status==='open'; });
+  const b = document.getElementById('buildRouteBtn');
+  if(!b) return;
+  b.textContent = 'Build Route ('+selectedRouteIds.length+'/'+ROUTE_MAX+')';
+  b.disabled = selectedRouteIds.length===0;
+}
+function toggleRouteSelect(id, cb){
+  if(cb.checked){
+    if(selectedRouteIds.length>=ROUTE_MAX){ cb.checked=false; showToast('Maximum '+ROUTE_MAX+' locates per route.'); return; }
+    selectedRouteIds.push(id);
+  } else {
+    selectedRouteIds = selectedRouteIds.filter(x=>x!==id);
+  }
+  updateRouteButton();
+}
+function clearRouteSelection(){ selectedRouteIds=[]; renderActiveTable(); }
+function haversineKm(a,b){
+  const R=6371, toR=Math.PI/180;
+  const dLat=(b.lat-a.lat)*toR, dLng=(b.lng-a.lng)*toR;
+  const h=Math.sin(dLat/2)**2+Math.cos(a.lat*toR)*Math.cos(b.lat*toR)*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+function routeAddress(t){ return (t.addrNum+' '+t.street).trim()+', Arlington, TX'; }
+function routePoint(t){ const p=parseLatLng(t.latlng); return p?p:null; }
+// Nearest-neighbor ordering. Starts from the stop farthest from the group's
+// center (an "end" of the cluster); stops with no coordinates go last.
+function orderRoute(tickets){
+  const withPt = tickets.filter(t=>routePoint(t));
+  const noPt = tickets.filter(t=>!routePoint(t));
+  if(withPt.length<2) return withPt.concat(noPt);
+  const c = {lat: withPt.reduce((a,t)=>a+routePoint(t).lat,0)/withPt.length,
+             lng: withPt.reduce((a,t)=>a+routePoint(t).lng,0)/withPt.length};
+  let remaining = withPt.slice();
+  remaining.sort((a,b)=>haversineKm(routePoint(b),c)-haversineKm(routePoint(a),c));
+  const ordered=[remaining.shift()];
+  while(remaining.length){
+    const last=routePoint(ordered[ordered.length-1]);
+    let bi=0,bd=Infinity;
+    remaining.forEach((t,i)=>{ const d=haversineKm(last,routePoint(t)); if(d<bd){bd=d;bi=i;} });
+    ordered.push(remaining.splice(bi,1)[0]);
+  }
+  return ordered.concat(noPt);
+}
+function routeStopParam(t){ const p=routePoint(t); return p ? p.lat+','+p.lng : routeAddress(t); }
+function googleRouteUrl(list){
+  if(!list.length) return '';
+  const dest = routeStopParam(list[list.length-1]);
+  const way = list.slice(0,-1).map(routeStopParam).join('|');
+  // No origin => Google Maps starts from the tech's current location.
+  let u='https://www.google.com/maps/dir/?api=1&travelmode=driving&destination='+encodeURIComponent(dest);
+  if(way) u+='&waypoints='+encodeURIComponent(way);
+  return u;
+}
+function openRouteModal(){
+  const picked = selectedRouteIds.map(id=>TICKETS.find(t=>t.ticketId===id)).filter(Boolean);
+  if(!picked.length) return;
+  currentRouteOrder = orderRoute(picked);
+  renderRouteModal();
+}
+function renderRouteModal(){
+  const missing = currentRouteOrder.filter(t=>!routePoint(t));
+  const rows = currentRouteOrder.map((t,i)=>`
+    <div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #e5e7eb;">
+      <div style="min-width:28px;height:28px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;">${i+1}</div>
+      <div style="flex:1;">
+        <div><b>${esc(t.ticketId)}</b>${t.emergency==='Yes'?' <span class="badge badge-emergency">EMERGENCY</span>':''} &middot; Inc ${esc(t.incident)||'—'}</div>
+        <div>${esc(t.addrNum+' '+t.street)}</div>
+        <div class="small-note">${esc((t.description||'').slice(0,100))}${!routePoint(t)?' &middot; <i>no coordinates — Google will look up the address</i>':''}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <button class="btn btn-ghost" style="min-height:28px;padding:0 8px;" onclick="moveRouteStop(${i},-1)">▲</button>
+        <button class="btn btn-ghost" style="min-height:28px;padding:0 8px;" onclick="moveRouteStop(${i},1)">▼</button>
+      </div>
+    </div>`).join('');
+  document.getElementById('detailContent').innerHTML = `
+    <h2 style="margin-bottom:6px;color:var(--navy);">Route — ${currentRouteOrder.length} stop${currentRouteOrder.length>1?'s':''}</h2>
+    <div class="small-note" style="margin-bottom:8px;">Ordered nearest-to-nearest. Use ▲▼ to adjust. Google Maps starts from the tech's current location.</div>
+    ${missing.length?`<div class="small-note" style="color:#c0392b;margin-bottom:8px;">${missing.length} stop(s) have no map coordinates and were placed last.</div>`:''}
+    ${rows}
+    <div class="row-btns" style="margin-top:14px;">
+      <button class="btn btn-gold" onclick="window.open(googleRouteUrl(currentRouteOrder),'_blank')">Open in Google Maps</button>
+      <button class="btn btn-cyan" onclick="reverseRoute()">Reverse</button>
+      <button class="btn btn-ghost" onclick="copyRouteLink()">Copy Link</button>
+      <button class="btn btn-ghost" onclick="printRoute()">Print</button>
+    </div>`;
+  document.getElementById('detailModal').classList.add('active');
+}
+function moveRouteStop(i,d){
+  const j=i+d; if(j<0||j>=currentRouteOrder.length) return;
+  const a=currentRouteOrder; [a[i],a[j]]=[a[j],a[i]]; renderRouteModal();
+}
+function reverseRoute(){ currentRouteOrder.reverse(); renderRouteModal(); }
+function copyRouteLink(){
+  const u=googleRouteUrl(currentRouteOrder);
+  if(navigator.clipboard) navigator.clipboard.writeText(u).then(()=>showToast('Route link copied — text or email it to the tech.'),()=>prompt('Copy this link:',u));
+  else prompt('Copy this link:',u);
+}
+function printRoute(){
+  const w=window.open('','_blank'); if(!w) return;
+  const rows=currentRouteOrder.map((t,i)=>`<tr><td>${i+1}</td><td>${esc(t.ticketId)}</td><td>${esc(t.incident)}</td><td>${esc(t.addrNum+' '+t.street)}</td><td>${esc((t.description||'').slice(0,120))}</td></tr>`).join('');
+  w.document.write(`<html><head><title>Route</title><style>body{font-family:Arial;padding:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:6px;text-align:left;font-size:13px}</style></head><body><h2>Fiber911 Locate Route</h2><table><tr><th>#</th><th>Ticket</th><th>Incident</th><th>Address</th><th>Description</th></tr>${rows}</table><p>${googleRouteUrl(currentRouteOrder)}</p></body></html>`);
+  w.document.close(); w.print();
+}
+
 function closeModal(){ document.getElementById('detailModal').classList.remove('active'); }
 function toggleEmergency(ticketId){
   const t = TICKETS.find(x=>x.ticketId===ticketId);
@@ -1877,26 +2020,40 @@ function fetchWithTimeout(url, options, timeoutMs){
     .finally(()=>clearTimeout(timer));
 }
 
-// Push every local ticket in one request (used by Sync Now, and safe to run
-// often since the Apps Script side upserts by Ticket # rather than appending).
-function pushAllToSheets(){
+// Tracks the version (Updated At) of each ticket the sheet is known to have,
+// so Sync Now only uploads what actually changed instead of every ticket.
+const PUSHED_KEY = 'fiber911_pushed_versions';
+function loadPushed(){ try{ return JSON.parse(localStorage.getItem(PUSHED_KEY))||{}; }catch(e){ return {}; } }
+function savePushed(m){ try{ localStorage.setItem(PUSHED_KEY, JSON.stringify(m)); }catch(e){} }
+function ticketVersion(t){ return t.updatedAt || t.createdAt || ''; }
+
+// Push only new/changed tickets, in small batches (the server handles each
+// batch with a single sheet read/write, so this stays well under timeouts).
+async function pushAllToSheets(){
   const s = loadSettings();
-  if(!s.sheetsUrl) return Promise.resolve();
-  return fetchWithTimeout(s.sheetsUrl, {
-    method:'POST',
-    headers:{'Content-Type':'text/plain;charset=utf-8'},
-    body: JSON.stringify({action:'syncAll', tickets: TICKETS.map(ticketToSyncRow)})
-  })
-    .then(r=>{
-      logDebug('pushAllToSheets HTTP '+r.status+' ('+TICKETS.length+' tickets)');
+  if(!s.sheetsUrl) return;
+  const pushed = loadPushed();
+  const dirty = TICKETS.filter(t=>pushed[t.ticketId] !== ticketVersion(t) || !ticketVersion(t));
+  logDebug('pushAllToSheets: '+dirty.length+' changed of '+TICKETS.length+' tickets');
+  const BATCH = 15;
+  for(let i=0;i<dirty.length;i+=BATCH){
+    const chunk = dirty.slice(i,i+BATCH);
+    try{
+      const r = await fetchWithTimeout(s.sheetsUrl, {
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({action:'syncAll', tickets: chunk.map(ticketToSyncRow)})
+      }, 45000);
+      logDebug('pushAllToSheets batch '+(i/BATCH+1)+' HTTP '+r.status+' ('+chunk.length+' tickets)');
       if(!r.ok) throw new Error('push HTTP '+r.status);
-      return r;
-    })
-    .catch(e=>{
-      const msg = e.name==='AbortError' ? 'timed out after 15s (connection likely too slow/unstable)' : e.message;
+      chunk.forEach(t=>{ pushed[t.ticketId] = ticketVersion(t); });
+      savePushed(pushed);
+    }catch(e){
+      const msg = e.name==='AbortError' ? 'timed out after 45s' : e.message;
       logDebug('pushAllToSheets FAILED: '+msg);
       throw new Error('push failed: '+msg);
-    });
+    }
+  }
 }
 // Pull the sheet's current tickets and merge into local storage. A remote
 // ticket only overwrites a local one if it's newer (by Updated At) — this is
@@ -1914,10 +2071,12 @@ function pullFromSheets(){
     .then(data=>{
       const remoteTickets = (data.tickets || []).map(rowToTicket).filter(t=>t.ticketId);
       logDebug('pullFromSheets got '+remoteTickets.length+' tickets');
+      const pushedMap = loadPushed();
       remoteTickets.forEach(remote=>{
         const local = TICKETS.find(t=>t.ticketId===remote.ticketId);
         if(!local){
           TICKETS.push({...remote, siteMap:''});
+          pushedMap[remote.ticketId] = ticketVersion(remote);
           return;
         }
         const remoteTime = remote.updatedAt || '';
@@ -1927,8 +2086,10 @@ function pullFromSheets(){
           const preservedSiteMap = local.siteMap;
           Object.assign(local, remote);
           local.siteMap = preservedSiteMap;
+          pushedMap[local.ticketId] = ticketVersion(remote);
         }
       });
+      savePushed(pushedMap);
       saveTickets(TICKETS);
       renderActiveTable(); renderDoneTable(); updateCounts(); populateCompletionSelect();
     })
@@ -1974,6 +2135,7 @@ async function promptResetSheet(){
   if(typed !== 'RESET'){ showToast('Reset cancelled'); return; }
 
   TICKETS = [];
+  savePushed({});
   saveTickets(TICKETS);
   updateCounts(); renderActiveTable(); renderDoneTable(); populateCompletionSelect();
   showToast('Local data cleared — clearing Sheet…');
