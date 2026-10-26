@@ -1837,8 +1837,51 @@ function deleteTicket(id){
   if(!confirm('Delete ticket '+id+'? This cannot be undone.')) return;
   TICKETS = TICKETS.filter(t=>t.ticketId!==id);
   saveTickets(TICKETS);
+  // Deleting locally isn't enough — the row is still in the Google Sheet and
+  // the next Sync would pull it right back. Record the delete on this device,
+  // and mark the sheet row "deleted" so every other device drops it too.
+  recordDeletion(id);
+  pushDeletionsToSheets().catch(()=>{}); // if offline, Sync Now retries it
   updateCounts(); renderActiveTable(); renderDoneTable(); closeModal();
+  checkIncidentField();
   showToast('Ticket deleted');
+}
+
+/* ---------- Deletions (sync-safe) ---------- */
+// The Apps Script only knows how to add/update rows, so a delete is sent as
+// an update that sets the row's Status to "deleted". Every device skips
+// tickets with that status when it pulls. Each delete is also remembered on
+// this device until the sheet confirms it, so it can't come back in between.
+const DELETED_KEY = 'fiber911_deleted_tickets';
+const DELETED_STATUS = 'deleted';
+function loadDeletions(){ try{ return JSON.parse(localStorage.getItem(DELETED_KEY))||{}; }catch(e){ return {}; } }
+function saveDeletions(m){ try{ localStorage.setItem(DELETED_KEY, JSON.stringify(m)); }catch(e){} }
+function recordDeletion(id){
+  const m = loadDeletions();
+  m[id] = {at: new Date().toISOString(), confirmed: false};
+  saveDeletions(m);
+}
+async function pushDeletionsToSheets(){
+  const s = loadSettings();
+  if(!s.sheetsUrl) return;
+  const m = loadDeletions();
+  const pending = Object.keys(m).filter(id=>!m[id].confirmed);
+  if(!pending.length) return;
+  // Only these three columns are sent, so nothing else in the row is touched.
+  const rows = pending.map(id=>({'Ticket #': id, 'Status': DELETED_STATUS, 'Updated At': m[id].at}));
+  const r = await fetchWithTimeout(s.sheetsUrl, {
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify({action:'syncAll', tickets: rows})
+  }, 45000);
+  logDebug('pushDeletionsToSheets HTTP '+r.status+' ('+pending.length+' deleted)');
+  if(!r.ok) throw new Error('delete push HTTP '+r.status);
+  const latest = loadDeletions();
+  pending.forEach(id=>{ if(latest[id]) latest[id].confirmed = true; });
+  saveDeletions(latest);
+  const pushed = loadPushed();
+  pending.forEach(id=>{ delete pushed[id]; });
+  savePushed(pushed);
 }
 
 /* ---------- Completion ---------- */
@@ -2228,7 +2271,19 @@ function pullFromSheets(){
       const remoteTickets = (data.tickets || []).map(rowToTicket).filter(t=>t.ticketId);
       logDebug('pullFromSheets got '+remoteTickets.length+' tickets');
       const pushedMap = loadPushed();
+      const deletions = loadDeletions();
+      let removedHere = 0;
       remoteTickets.forEach(remote=>{
+        // Deleted on any device (row marked "deleted"), or deleted here and
+        // not yet confirmed by the sheet: make sure it's gone, never re-add it.
+        const remoteDeleted = String(remote.status||'').trim().toLowerCase() === DELETED_STATUS;
+        if(remoteDeleted || deletions[remote.ticketId]){
+          const before = TICKETS.length;
+          TICKETS = TICKETS.filter(t=>t.ticketId!==remote.ticketId);
+          removedHere += before - TICKETS.length;
+          delete pushedMap[remote.ticketId];
+          return;
+        }
         const local = TICKETS.find(t=>t.ticketId===remote.ticketId);
         if(!local){
           TICKETS.push({...remote, siteMap:''});
@@ -2245,6 +2300,7 @@ function pullFromSheets(){
           pushedMap[local.ticketId] = ticketVersion(remote);
         }
       });
+      if(removedHere) logDebug('pullFromSheets removed '+removedHere+' deleted ticket(s)');
       savePushed(pushedMap);
       saveTickets(TICKETS);
       renderActiveTable(); renderDoneTable(); updateCounts(); populateCompletionSelect();
@@ -2268,6 +2324,7 @@ async function syncNow(){
   logDebug('--- Sync Now started ---');
   try{
     await pushAllToSheets();
+    await pushDeletionsToSheets();
     await pullFromSheets();
     saveSettings({...loadSettings(), lastSyncedAt: new Date().toISOString()});
     updateLastSyncedDisplay();
