@@ -191,6 +191,46 @@
   .map-popup div{margin-bottom:2px;font-size:12.5px;}
   .map-popup button{margin-top:8px;}
   .small-note{font-size:11.5px;color:var(--text-mute);margin-top:6px;}
+
+  /* Dashboard */
+  .dash-head{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;}
+  .dash-range{display:flex;gap:6px;flex-wrap:wrap;}
+  .dash-range .btn{min-height:36px;padding:0 12px;font-size:12.5px;}
+  .dash-section{font-family:'Sora',sans-serif;font-size:13px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.05em;margin:22px 2px 10px;}
+  .dash-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px;}
+  .kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;text-align:left;font:inherit;color:inherit;}
+  button.kpi{cursor:pointer;}
+  button.kpi:hover{border-color:#c9d3df;}
+  .kpi .lbl{font-size:11px;font-weight:600;color:var(--text-mute);text-transform:uppercase;letter-spacing:.03em;}
+  .kpi .num{font-family:'Sora',sans-serif;font-size:25px;font-weight:700;color:var(--navy);line-height:1.2;margin-top:4px;font-variant-numeric:tabular-nums;}
+  .kpi .sub{font-size:11.5px;color:var(--text-mute);margin-top:2px;}
+  .kpi.alert{border-left:4px solid var(--red);}
+  .kpi.alert .num{color:var(--red);}
+  .kpi.warn{border-left:4px solid #d4a017;}
+  .kpi.emerg{border-left:4px solid #8e44ad;}
+  .dash-two{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .dash-two > .card{margin-bottom:0;}
+  @media(max-width:720px){.dash-two{grid-template-columns:1fr;} .dash-two > .card{margin-bottom:14px;}}
+  .dash-chart{position:relative;width:100%;}
+  .dash-chart svg{display:block;overflow:visible;}
+  .dash-chart .axis{font-family:'JetBrains Mono',monospace;font-size:10.5px;fill:var(--text-mute);}
+  .dash-tip{position:absolute;pointer-events:none;background:var(--navy);color:#fff;font-size:12px;line-height:1.45;padding:7px 10px;border-radius:7px;white-space:nowrap;transform:translate(-50%,calc(-100% - 8px));display:none;z-index:5;box-shadow:0 3px 10px rgba(0,0,0,.18);}
+  .dash-tip b{font-family:'JetBrains Mono',monospace;}
+  .dash-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--text-mute);margin-bottom:8px;}
+  .dash-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
+  .hbar-row{display:grid;grid-template-columns:minmax(80px,130px) 1fr auto;align-items:center;gap:10px;font-size:12.5px;margin-bottom:8px;}
+  .hbar-row .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);}
+  .hbar-track{height:12px;background:#eef2f6;border-radius:4px;overflow:hidden;}
+  .hbar-fill{height:100%;border-radius:0 4px 4px 0;}
+  .hbar-row .val{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);text-align:right;white-space:nowrap;}
+  .hbar-row .val span{color:var(--text-mute);}
+  #dashMapContainer{height:340px;width:100%;border-radius:var(--radius);}
+  .dash-table td,.dash-table th{white-space:nowrap;}
+  .dash-table tr.click{cursor:pointer;}
+  .dash-table .num{text-align:right;font-family:'JetBrains Mono',monospace;}
+  @media(max-width:640px){.dash-table .hide-sm{display:none;} .dash-table td,.dash-table th{padding:8px 6px;}}
+  .dash-table details summary{cursor:pointer;}
+  details.dash-details summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--navy);margin-top:10px;}
 </style>
 </head>
 <body>
@@ -209,6 +249,7 @@
   <button data-tab="completion">Completion</button>
   <button data-tab="log">Completed Log <span class="count" id="countDone">0</span></button>
   <button data-tab="map">Map</button>
+  <button data-tab="dashboard">Dashboard</button>
 </nav>
 
 <main>
@@ -458,6 +499,94 @@
     </div>
   </section>
 
+  <!-- DASHBOARD PANEL -->
+  <section class="panel" id="panel-dashboard">
+    <div class="card">
+      <div class="dash-head">
+        <div>
+          <h2>Dashboard</h2>
+          <div class="hint" id="dashAsOf" style="margin-bottom:0;"></div>
+        </div>
+        <div class="dash-range">
+          <button class="btn btn-ghost dash-range-btn" data-range="30" onclick="setDashRange('30')">30 days</button>
+          <button class="btn btn-cyan dash-range-btn" data-range="90" onclick="setDashRange('90')">90 days</button>
+          <button class="btn btn-ghost dash-range-btn" data-range="ytd" onclick="setDashRange('ytd')">This year</button>
+          <button class="btn btn-ghost dash-range-btn" data-range="all" onclick="setDashRange('all')">All</button>
+        </div>
+      </div>
+      <div class="small-note">The date range applies to completed work, invoicing, workload and trends. Ticket status always shows right now.</div>
+    </div>
+
+    <div id="dashEmpty" class="card empty" style="display:none;">
+      <div class="big">No tickets yet</div>
+      <div>Create tickets on the Intake tab, or tap Sync Now to pull them from the Google Sheet.</div>
+    </div>
+
+    <div id="dashBody">
+      <div class="dash-section">Ticket status — right now</div>
+      <div class="dash-kpis" id="dashStatusKpis"></div>
+      <div class="card">
+        <h2>Needs attention</h2>
+        <div class="hint">Open tickets that are overdue (over 48 hours), due within the next 24 hours, or flagged emergency — oldest first. Tap a row to open it.</div>
+        <div class="table-wrap"><table class="dash-table" id="dashAttention"></table></div>
+      </div>
+
+      <div class="dash-section">Invoicing &amp; revenue</div>
+      <div class="dash-kpis" id="dashMoneyKpis"></div>
+      <div class="card">
+        <h2>Completed work by <span id="dashRevUnit">week</span></h2>
+        <div class="hint">Estimated from hours and footage at your current Invoice Settings rates, by completion date.</div>
+        <div class="dash-chart" id="dashRevChart"></div>
+      </div>
+      <div class="card">
+        <h2>Completed, not yet invoiced</h2>
+        <div class="hint">All completed tickets with no invoice # yet, regardless of date range.</div>
+        <div class="table-wrap"><table class="dash-table" id="dashUnbilled"></table></div>
+      </div>
+
+      <div class="dash-section">Map &amp; workload</div>
+      <div class="card">
+        <h2>Open tickets</h2>
+        <div class="legend" style="margin-bottom:10px;">
+          <span><span class="legend-dot" style="background:#2ecc71;"></span>Open (&lt;48h)</span>
+          <span><span class="legend-dot" style="background:#c0392b;"></span>Overdue (&gt;48h)</span>
+          <span><span class="legend-dot" style="background:#8e44ad;"></span>Emergency</span>
+        </div>
+        <div class="small-note" id="dashMapNote" style="margin-bottom:8px;"></div>
+        <div id="dashMapContainer"></div>
+      </div>
+      <div class="dash-two">
+        <div class="card">
+          <h2>Completed by tech</h2>
+          <div class="hint">Tickets completed in the date range, with total hours.</div>
+          <div id="dashTechBars"></div>
+        </div>
+        <div class="card">
+          <h2>Open tickets by area</h2>
+          <div class="hint">Quadrants around the city-center point the map opens on.</div>
+          <div id="dashAreaBars"></div>
+        </div>
+      </div>
+
+      <div class="dash-section">Trends &amp; turnaround</div>
+      <div class="dash-kpis" id="dashTrendKpis"></div>
+      <div class="card">
+        <h2>Received vs completed per <span class="dashUnit">week</span></h2>
+        <div class="dash-legend"><span><i style="background:#3b5bdb"></i>Received</span><span><i style="background:#ea580c"></i>Completed</span></div>
+        <div class="dash-chart" id="dashFlowChart"></div>
+      </div>
+      <div class="card">
+        <h2>Average turnaround per <span class="dashUnit">week</span></h2>
+        <div class="hint">Hours from when we received the ticket to when it was completed, for tickets completed in that period. Dashed line = 48-hour target.</div>
+        <div class="dash-chart" id="dashTurnChart"></div>
+        <details class="dash-details">
+          <summary>View trends as a table</summary>
+          <div class="table-wrap" style="margin-top:8px;"><table class="dash-table" id="dashTrendTable"></table></div>
+        </details>
+      </div>
+    </div>
+  </section>
+
 </main>
 
 <!-- Detail modal -->
@@ -530,6 +659,15 @@ let doneSortMode = 'recent';
 const ROUTE_MAX = 10;
 let selectedRouteIds = [];
 let currentRouteOrder = [];
+// Dashboard state — declared up here with the rest so nothing hits a
+// "before initialization" error if a dashboard refresh fires early.
+let dashRange = '90'; // '30' | '90' | 'ytd' | 'all'
+let dashMap = null;
+let dashMarkersLayer = null;
+let dashResizeTimer = null;
+let dashShowAllUnbilled = false;
+const DASH_BLUE = '#3b5bdb';   // incoming / open work
+const DASH_ORANGE = '#ea580c'; // completed work (brand accent)
 
 function flashAutosave(){
   const el = document.getElementById('autosaveText');
@@ -548,6 +686,7 @@ document.querySelectorAll('nav.tabs button').forEach(btn=>{
     if(btn.dataset.tab==='active') renderActiveTable();
     if(btn.dataset.tab==='log') renderDoneTable();
     if(btn.dataset.tab==='intake') updateTicketPreview();
+    if(btn.dataset.tab==='dashboard') renderDashboard();
     if(btn.dataset.tab==='map'){
       initCityMapIfNeeded();
       // Leaflet needs a size recalculation once its container is actually visible.
@@ -1012,6 +1151,7 @@ function updateCounts(){
   document.getElementById('countActive').textContent = TICKETS.filter(t=>t.status==='open').length;
   document.getElementById('countDone').textContent = TICKETS.filter(t=>t.status==='completed').length;
   if(cityMap) renderMapMarkers();
+  if(dashboardVisible()) renderDashboard();
 }
 updateCounts();
 
@@ -1081,6 +1221,7 @@ function mapPopupHtml(t){
 }
 function closeMapPopupAndOpenDetail(id){
   if(cityMap) cityMap.closePopup();
+  if(dashMap) dashMap.closePopup();
   openDetail(id);
 }
 
@@ -2196,6 +2337,417 @@ function showToast(msg){
   clearTimeout(showToast._timer);
   showToast._timer = setTimeout(()=>t.classList.remove('show'), duration);
 }
+
+/* ---------- Dashboard ---------- */
+// Read-only view over TICKETS. Nothing here writes ticket data except the
+// "Invoice" button, which just calls the existing generateInvoicePDF().
+function dashboardVisible(){
+  const p = document.getElementById('panel-dashboard');
+  return !!(p && p.classList.contains('active'));
+}
+function setDashRange(r){
+  dashRange = r;
+  document.querySelectorAll('.dash-range-btn').forEach(b=>{
+    const on = b.dataset.range === r;
+    b.classList.toggle('btn-cyan', on);
+    b.classList.toggle('btn-ghost', !on);
+  });
+  renderDashboard();
+}
+function goToTab(name){
+  const b = document.querySelector('nav.tabs button[data-tab="'+name+'"]');
+  if(b) b.click();
+}
+function dashDate(s){
+  if(!s) return null;
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+// Same clock the map uses for green/red, so "overdue" means the same thing everywhere.
+function dashAgeStart(t){ return dashDate(t.createdAt) || dashDate(t.weReceived); }
+// Turnaround is measured from when we received the work order.
+function dashReceived(t){ return dashDate(t.weReceived) || dashDate(t.createdAt); }
+function dashCompleted(t){ return t.status==='completed' ? dashDate(t.completedAt) : null; }
+function dashAmount(t, inv){
+  return (parseFloat(t.duration)||0) * inv.hourlyRate + (parseFloat(t.footage)||0) * inv.footageRate;
+}
+function dashMoney(n){
+  return '$' + Math.round(n).toLocaleString('en-US');
+}
+function dashHours(h){
+  if(h == null || isNaN(h)) return '—';
+  if(h >= 48) return (h/24).toFixed(1) + ' d';
+  return h.toFixed(h < 10 ? 1 : 0) + ' h';
+}
+function dashTurnaround(t){
+  const r = dashReceived(t), c = dashCompleted(t);
+  if(!r || !c) return null;
+  const h = (c - r) / 3600000;
+  return h >= 0 ? h : null;
+}
+function dashRangeStart(){
+  const now = new Date();
+  if(dashRange === '30') return new Date(now.getTime() - 30*86400000);
+  if(dashRange === '90') return new Date(now.getTime() - 90*86400000);
+  if(dashRange === 'ytd') return new Date(now.getFullYear(), 0, 1);
+  return null; // all
+}
+function dashRangeLabel(){
+  return {'30':'last 30 days','90':'last 90 days','ytd':'this year','all':'all time'}[dashRange];
+}
+// Weekly buckets (Mon–Sun) for 30/90 days, monthly for this year / all time.
+function dashBuckets(){
+  const now = new Date();
+  const out = [];
+  const weekly = dashRange === '30' || dashRange === '90';
+  if(weekly){
+    const n = dashRange === '30' ? 5 : 13;
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // back to Monday
+    for(let i = n-1; i >= 0; i--){
+      const s = new Date(d); s.setDate(d.getDate() - 7*i);
+      const e = new Date(s); e.setDate(s.getDate() + 7);
+      out.push({start:s, end:e, label:(s.getMonth()+1)+'/'+s.getDate(), long:'Week of '+s.toLocaleDateString('en-US',{month:'short',day:'numeric'})});
+    }
+  } else {
+    let n = 12;
+    if(dashRange === 'ytd') n = now.getMonth() + 1;
+    if(dashRange === 'all'){
+      let earliest = now;
+      TICKETS.forEach(t=>{ const r = dashReceived(t); if(r && r < earliest) earliest = r; });
+      n = (now.getFullYear()-earliest.getFullYear())*12 + (now.getMonth()-earliest.getMonth()) + 1;
+      n = Math.max(1, Math.min(24, n)); // keep the chart readable
+    }
+    const multiYear = n > 12 || dashRange === 'all';
+    for(let i = n-1; i >= 0; i--){
+      const s = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const e = new Date(s.getFullYear(), s.getMonth() + 1, 1);
+      const m = s.toLocaleString('en-US',{month:'short'});
+      out.push({start:s, end:e, label: m + (multiYear && (s.getMonth()===0 || i===n-1) ? " '"+String(s.getFullYear()).slice(2) : ''), long: m+' '+s.getFullYear()});
+    }
+  }
+  return {weekly, buckets:out};
+}
+function dashBucketIndex(buckets, d){
+  if(!d) return -1;
+  for(let i = 0; i < buckets.length; i++){
+    if(d >= buckets[i].start && d < buckets[i].end) return i;
+  }
+  return -1;
+}
+function dashNiceScale(max, integer){
+  if(!(max > 0)) max = 1;
+  let step = max / 4;
+  const mag = Math.pow(10, Math.floor(Math.log10(step)));
+  const norm = step / mag;
+  step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
+  if(integer) step = Math.max(1, Math.round(step));
+  return {step, max: step * Math.ceil(max / step)};
+}
+
+// Vertical bar chart (one or more series, grouped). Hand-built SVG so the app
+// doesn't take on a chart library. Hover/tap a column for exact values.
+function dashBarChart(elId, labels, longLabels, series, opts){
+  const el = document.getElementById(elId);
+  if(!el) return;
+  opts = opts || {};
+  const fmt = opts.fmt || (v=>String(v));
+  const W = Math.max(280, Math.floor(el.clientWidth || 600));
+  const H = opts.height || 210;
+  const padL = 46, padR = 6, padT = 10, padB = 24;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const all = [];
+  series.forEach(s=>s.values.forEach(v=>{ if(v != null) all.push(v); }));
+  if(opts.refLine) all.push(opts.refLine);
+  const sc = dashNiceScale(Math.max(0, ...all), opts.integer);
+  const y = v => padT + plotH - (v / sc.max) * plotH;
+  const n = labels.length, slot = plotW / n, gap = 2;
+  const barW = Math.max(3, Math.min(30, (slot * 0.7 - gap * (series.length - 1)) / series.length));
+  const groupW = barW * series.length + gap * (series.length - 1);
+  let svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.aria||'chart')}">`;
+  for(let v = 0; v <= sc.max + 1e-9; v += sc.step){
+    const yy = y(v).toFixed(1);
+    svg += `<line x1="${padL}" x2="${W-padR}" y1="${yy}" y2="${yy}" stroke="${v===0?'#cbd5e1':'#eef2f6'}" stroke-width="1"/>`;
+    svg += `<text class="axis" x="${padL-8}" y="${yy}" text-anchor="end" dominant-baseline="middle">${esc(fmt(v))}</text>`;
+  }
+  if(opts.refLine){
+    const yy = y(opts.refLine).toFixed(1);
+    svg += `<line x1="${padL}" x2="${W-padR}" y1="${yy}" y2="${yy}" stroke="#c0392b" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+  }
+  const every = Math.max(1, Math.ceil(n * 40 / plotW));
+  labels.forEach((lab, i)=>{
+    const cx = padL + slot * i + slot / 2;
+    series.forEach((s, si)=>{
+      const v = s.values[i];
+      if(v == null || v <= 0) return;
+      const x = cx - groupW / 2 + si * (barW + gap);
+      const top = y(v), base = y(0), h = base - top;
+      const r = Math.min(4, barW / 2, h);
+      svg += `<path d="M${x.toFixed(1)},${base.toFixed(1)} V${(top+r).toFixed(1)} Q${x.toFixed(1)},${top.toFixed(1)} ${(x+r).toFixed(1)},${top.toFixed(1)} H${(x+barW-r).toFixed(1)} Q${(x+barW).toFixed(1)},${top.toFixed(1)} ${(x+barW).toFixed(1)},${(top+r).toFixed(1)} V${base.toFixed(1)} Z" fill="${s.color}"/>`;
+    });
+    if(i % every === 0 || i === n - 1 && n <= 6){
+      svg += `<text class="axis" x="${cx.toFixed(1)}" y="${H-6}" text-anchor="middle">${esc(lab)}</text>`;
+    }
+    svg += `<rect class="dash-hit" data-i="${i}" x="${(padL + slot*i).toFixed(1)}" y="${padT}" width="${slot.toFixed(1)}" height="${plotH}" fill="transparent"/>`;
+  });
+  svg += `</svg><div class="dash-tip"></div>`;
+  el.innerHTML = svg;
+  const tip = el.querySelector('.dash-tip');
+  const show = rect=>{
+    const i = +rect.dataset.i;
+    const vals = series.map(s=>s.values[i]).filter(v=>v != null);
+    const topV = vals.length ? Math.max(...vals) : 0;
+    tip.innerHTML = `<div style="opacity:.8;margin-bottom:2px;">${esc(longLabels[i])}</div>` +
+      series.map(s=>`<div>${series.length>1?`<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${s.color};margin-right:6px;"></span>`:''}${esc(s.name)}: <b>${s.values[i]==null?'—':esc(fmt(s.values[i], true))}</b></div>`).join('');
+    tip.style.left = Math.min(Math.max(padL + slot*i + slot/2, 70), W - 70) + 'px';
+    tip.style.top = y(topV) + 'px';
+    tip.style.display = 'block';
+  };
+  el.querySelectorAll('.dash-hit').forEach(rect=>{
+    rect.addEventListener('mouseenter', ()=>show(rect));
+    rect.addEventListener('touchstart', ()=>show(rect), {passive:true});
+  });
+  el.querySelector('svg').addEventListener('mouseleave', ()=>{ tip.style.display = 'none'; });
+}
+
+// Horizontal bar list: label, bar, value. Values are always printed, so the
+// bars never carry meaning by color alone.
+function dashHBars(elId, rows, color, emptyMsg){
+  const el = document.getElementById(elId);
+  if(!rows.length){ el.innerHTML = `<div class="empty" style="padding:18px 8px;">${esc(emptyMsg)}</div>`; return; }
+  const max = Math.max(...rows.map(r=>r.value), 1);
+  el.innerHTML = rows.map(r=>`
+    <div class="hbar-row">
+      <div class="name" title="${esc(r.label)}">${esc(r.label)}</div>
+      <div class="hbar-track"><div class="hbar-fill" style="width:${Math.max(2, r.value/max*100).toFixed(1)}%;background:${color};"></div></div>
+      <div class="val">${r.value}${r.sub ? ` <span>· ${esc(r.sub)}</span>` : ''}</div>
+    </div>`).join('');
+}
+
+function dashKpi(k){
+  const tag = k.onclick ? 'button' : 'div';
+  return `<${tag} class="kpi ${k.cls||''}" ${k.onclick ? `onclick="${k.onclick}"` : ''}>
+    <div class="lbl">${k.lbl}</div>
+    <div class="num">${k.num}</div>
+    ${k.sub ? `<div class="sub">${k.sub}</div>` : ''}
+  </${tag}>`;
+}
+
+function renderDashboard(){
+  const empty = TICKETS.length === 0;
+  document.getElementById('dashEmpty').style.display = empty ? 'block' : 'none';
+  document.getElementById('dashBody').style.display = empty ? 'none' : 'block';
+  const s = loadSettings();
+  document.getElementById('dashAsOf').textContent =
+    'Showing ' + dashRangeLabel() + ' · ' + TICKETS.length + ' tickets on this device' +
+    (s.lastSyncedAt ? ' · last synced ' + new Date(s.lastSyncedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '');
+  if(empty) return;
+
+  const now = Date.now();
+  const inv = getInvoiceSettings();
+  const start = dashRangeStart();
+  const inRange = d => d && (!start || d >= start);
+
+  /* --- Status (right now) --- */
+  const open = TICKETS.filter(t=>t.status !== 'completed');
+  const ageH = t => { const d = dashAgeStart(t); return d ? (now - d) / 3600000 : null; };
+  const overdue = open.filter(t=>{ const a = ageH(t); return a != null && a > OVERDUE_HOURS; });
+  const dueSoon = open.filter(t=>{ const a = ageH(t); return a != null && a > OVERDUE_HOURS - 24 && a <= OVERDUE_HOURS; });
+  const emerg = open.filter(t=>t.emergency === 'Yes');
+  const oldest = open.slice().sort((a,b)=>(ageH(b)||0) - (ageH(a)||0))[0];
+  const completedInRange = TICKETS.filter(t=>inRange(dashCompleted(t)));
+  const receivedInRange = TICKETS.filter(t=>inRange(dashReceived(t)));
+
+  document.getElementById('dashStatusKpis').innerHTML = [
+    {lbl:'Open', num:open.length, sub:'Tap to view Active', onclick:"goToTab('active')"},
+    {lbl:'Overdue (&gt;48h)', num:overdue.length, sub: overdue.length ? 'Needs attention' : 'None overdue', cls: overdue.length ? 'alert' : ''},
+    {lbl:'Due in next 24h', num:dueSoon.length, sub:'Open 24–48 hours', cls: dueSoon.length ? 'warn' : ''},
+    {lbl:'Emergency (open)', num:emerg.length, sub: emerg.length ? 'Open emergencies' : 'None open', cls: emerg.length ? 'emerg' : ''},
+    {lbl:'Oldest open', num: oldest ? dashHours(ageH(oldest)) : '—', sub: oldest ? esc(oldest.ticketId) : 'No open tickets', onclick: oldest ? `openDetail('${oldest.ticketId}')` : ''},
+    {lbl:'Completed', num:completedInRange.length, sub: dashRangeLabel(), onclick:"goToTab('log')"}
+  ].map(dashKpi).join('');
+
+  const attention = open.filter(t=>{ const a = ageH(t); return t.emergency === 'Yes' || (a != null && a > OVERDUE_HOURS - 24); })
+    .sort((a,b)=>(ageH(b)||0) - (ageH(a)||0));
+  const attTable = document.getElementById('dashAttention');
+  if(!attention.length){
+    attTable.innerHTML = '<tr><td class="empty" style="border:none;">Nothing overdue or due soon. </td></tr>';
+  } else {
+    attTable.innerHTML = '<thead><tr><th>Ticket</th><th>Address</th><th>Open for</th><th>Flag</th></tr></thead><tbody>' +
+      attention.slice(0, 15).map(t=>{
+        const a = ageH(t);
+        const flag = (a != null && a > OVERDUE_HOURS) ? '<span class="badge" style="background:#fdecea;color:#c0392b;">OVERDUE</span>'
+                   : (a != null && a > OVERDUE_HOURS - 24) ? '<span class="badge badge-open">DUE SOON</span>' : '';
+        return `<tr class="click" onclick="openDetail('${t.ticketId}')">
+          <td class="ticket-id">${esc(t.ticketId)}</td>
+          <td>${esc(t.addrNum)} ${esc(t.street)}</td>
+          <td class="num">${dashHours(a)}</td>
+          <td>${flag}${t.emergency==='Yes' ? ' <span class="badge badge-emergency">EMERGENCY</span>' : ''}</td></tr>`;
+      }).join('') + '</tbody>' +
+      (attention.length > 15 ? `<tfoot><tr><td colspan="4" class="small-note">+ ${attention.length-15} more on the Active tab</td></tr></tfoot>` : '');
+  }
+
+  /* --- Invoicing --- */
+  const billedInRange = completedInRange.filter(t=>t.invoiceNum);
+  const billedAmt = billedInRange.reduce((sum,t)=>sum + dashAmount(t, inv), 0);
+  const workAmt = completedInRange.reduce((sum,t)=>sum + dashAmount(t, inv), 0);
+  const unbilled = TICKETS.filter(t=>t.status === 'completed' && !t.invoiceNum)
+    .sort((a,b)=>(dashCompleted(a)||0) - (dashCompleted(b)||0));
+  const unbilledAmt = unbilled.reduce((sum,t)=>sum + dashAmount(t, inv), 0);
+  const missingInputs = completedInRange.filter(t=>!(parseFloat(t.duration) > 0) && !(parseFloat(t.footage) > 0)).length;
+
+  document.getElementById('dashMoneyKpis').innerHTML = [
+    {lbl:'Completed work (est.)', num:dashMoney(workAmt), sub: completedInRange.length + ' tickets · ' + dashRangeLabel()},
+    {lbl:'Invoiced (est.)', num:dashMoney(billedAmt), sub: billedInRange.length + ' tickets with an invoice #'},
+    {lbl:'Not yet invoiced', num:dashMoney(unbilledAmt), sub: unbilled.length + ' tickets · all time', cls: unbilled.length ? 'warn' : ''},
+    {lbl:'Avg per ticket', num: completedInRange.length ? dashMoney(workAmt / completedInRange.length) : '—', sub: missingInputs ? missingInputs + ' with no hours/footage' : '$'+inv.hourlyRate+'/hr · $'+inv.footageRate+'/ft'}
+  ].map(dashKpi).join('');
+
+  const ubTable = document.getElementById('dashUnbilled');
+  if(!unbilled.length){
+    ubTable.innerHTML = '<tr><td class="empty" style="border:none;">Every completed ticket has an invoice #.</td></tr>';
+  } else {
+    ubTable.innerHTML = '<thead><tr><th>Ticket</th><th>Address</th><th class="hide-sm">Completed</th><th class="num hide-sm">Hrs</th><th class="num hide-sm">Ft</th><th class="num">Est.</th><th></th></tr></thead><tbody>' +
+      unbilled.map((t, i)=>{
+        const c = dashCompleted(t);
+        return `<tr class="${i >= 8 ? 'dash-more' : ''}" ${i >= 8 && !dashShowAllUnbilled ? 'style="display:none;"' : ''}>
+          <td class="ticket-id" style="cursor:pointer;" onclick="openDetail('${t.ticketId}')">${esc(t.ticketId)}</td>
+          <td>${esc(t.addrNum)} ${esc(t.street)}</td>
+          <td class="hide-sm">${c ? c.toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—'}</td>
+          <td class="num hide-sm">${esc(t.duration)||'—'}</td>
+          <td class="num hide-sm">${esc(t.footage)||'—'}</td>
+          <td class="num">${dashMoney(dashAmount(t, inv))}</td>
+          <td><button class="btn btn-primary" style="min-height:32px;padding:0 12px;font-size:12px;" onclick="dashInvoice('${t.ticketId}')">Invoice</button></td></tr>`;
+      }).join('') + '</tbody>' +
+      (unbilled.length > 8 ? `<tfoot><tr><td colspan="7" style="border:none;"><button class="btn btn-ghost" style="min-height:34px;font-size:12.5px;" onclick="dashShowAllUnbilled=!dashShowAllUnbilled;renderDashboard();">${dashShowAllUnbilled ? 'Show fewer' : 'Show all '+unbilled.length}</button></td></tr></tfoot>` : '');
+  }
+
+  /* --- Trends (bucketed) --- */
+  const {weekly, buckets} = dashBuckets();
+  const unit = weekly ? 'week' : 'month';
+  document.getElementById('dashRevUnit').textContent = unit;
+  document.querySelectorAll('.dashUnit').forEach(e=>e.textContent = unit);
+  const received = buckets.map(()=>0), completed = buckets.map(()=>0), revenue = buckets.map(()=>0);
+  const turnSum = buckets.map(()=>0), turnN = buckets.map(()=>0);
+  TICKETS.forEach(t=>{
+    const ri = dashBucketIndex(buckets, dashReceived(t));
+    if(ri >= 0) received[ri]++;
+    const ci = dashBucketIndex(buckets, dashCompleted(t));
+    if(ci >= 0){
+      completed[ci]++;
+      revenue[ci] += dashAmount(t, inv);
+      const h = dashTurnaround(t);
+      if(h != null){ turnSum[ci] += h; turnN[ci]++; }
+    }
+  });
+  const turnAvg = turnSum.map((s,i)=>turnN[i] ? s / turnN[i] : null);
+
+  const turns = completedInRange.map(dashTurnaround).filter(h=>h != null).sort((a,b)=>a-b);
+  const median = turns.length ? (turns.length % 2 ? turns[(turns.length-1)/2] : (turns[turns.length/2-1] + turns[turns.length/2]) / 2) : null;
+  const avg = turns.length ? turns.reduce((a,b)=>a+b, 0) / turns.length : null;
+  const within = turns.length ? Math.round(turns.filter(h=>h <= OVERDUE_HOURS).length / turns.length * 100) : null;
+  document.getElementById('dashTrendKpis').innerHTML = [
+    {lbl:'Received', num:receivedInRange.length, sub: dashRangeLabel()},
+    {lbl:'Median turnaround', num:dashHours(median), sub: turns.length + ' completed tickets'},
+    {lbl:'Avg turnaround', num:dashHours(avg), sub:'received → completed'},
+    {lbl:'Done within 48h', num: within == null ? '—' : within + '%', sub:'of completed tickets', cls: within != null && within < 80 ? 'warn' : ''}
+  ].map(dashKpi).join('');
+
+  const labels = buckets.map(b=>b.label), longs = buckets.map(b=>b.long);
+  const moneyAxis = (v, exact)=> exact ? dashMoney(v) : (v >= 1000 ? '$'+(v/1000).toFixed(v % 1000 ? 1 : 0)+'k' : '$'+v);
+  // Charts size to their containers, so draw after layout settles.
+  const drawCharts = ()=>{
+    dashBarChart('dashRevChart', labels, longs, [{name:'Completed work (est.)', color:DASH_ORANGE, values:revenue}], {fmt:moneyAxis, aria:'Estimated completed work per '+unit});
+    dashBarChart('dashFlowChart', labels, longs, [
+      {name:'Received', color:DASH_BLUE, values:received},
+      {name:'Completed', color:DASH_ORANGE, values:completed}
+    ], {integer:true, aria:'Tickets received and completed per '+unit});
+    dashBarChart('dashTurnChart', labels, longs, [{name:'Avg turnaround', color:DASH_ORANGE, values:turnAvg}],
+      {fmt:(v, exact)=> exact ? dashHours(v) + ' (' + v.toFixed(1) + ' h)' : Math.round(v)+'h', refLine:OVERDUE_HOURS, aria:'Average turnaround hours per '+unit});
+  };
+  drawCharts();
+  document.getElementById('dashBody')._redraw = drawCharts;
+
+  document.getElementById('dashTrendTable').innerHTML =
+    `<thead><tr><th>${weekly?'Week of':'Month'}</th><th class="num">Received</th><th class="num">Completed</th><th class="num">Avg turnaround</th><th class="num">Est. work</th></tr></thead><tbody>` +
+    buckets.map((b,i)=>`<tr><td>${esc(b.long.replace('Week of ',''))}</td><td class="num">${received[i]}</td><td class="num">${completed[i]}</td><td class="num">${dashHours(turnAvg[i])}</td><td class="num">${dashMoney(revenue[i])}</td></tr>`).reverse().join('') +
+    '</tbody>';
+
+  /* --- Workload --- */
+  const techs = {};
+  completedInRange.forEach(t=>{
+    const name = (t.completedBy || '').trim() || 'Not recorded';
+    const key = name.toLowerCase();
+    if(!techs[key]) techs[key] = {label:name, value:0, hours:0};
+    techs[key].value++;
+    techs[key].hours += parseFloat(t.duration) || 0;
+  });
+  dashHBars('dashTechBars',
+    Object.values(techs).sort((a,b)=>b.value - a.value).slice(0, 10)
+      .map(r=>({label:r.label, value:r.value, sub: r.hours ? (Math.round(r.hours*10)/10)+' h' : ''})),
+    DASH_ORANGE, 'No completed tickets in this range.');
+
+  const CENTER = {lat:32.7357, lng:-97.1081}; // the same point the City Map opens on
+  const areas = {'North-east':0, 'North-west':0, 'South-east':0, 'South-west':0, 'No coordinates':0};
+  open.forEach(t=>{
+    const p = parseLatLng(t.latlng);
+    if(!p){ areas['No coordinates']++; return; }
+    areas[(p.lat >= CENTER.lat ? 'North' : 'South') + '-' + (p.lng >= CENTER.lng ? 'east' : 'west')]++;
+  });
+  dashHBars('dashAreaBars',
+    Object.entries(areas).filter(([k,v])=>v > 0 || k !== 'No coordinates').map(([label,value])=>({label, value})),
+    DASH_BLUE, 'No open tickets.');
+
+  /* --- Map --- */
+  renderDashMap(open);
+}
+
+function renderDashMap(open){
+  const note = document.getElementById('dashMapNote');
+  if(typeof L === 'undefined'){
+    note.textContent = 'Map library failed to load — check your connection and reload.';
+    document.getElementById('dashMapContainer').style.display = 'none';
+    return;
+  }
+  if(!dashMap){
+    try{
+      dashMap = L.map('dashMapContainer', {scrollWheelZoom:false}).setView([32.7357, -97.1081], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'&copy; OpenStreetMap contributors', maxZoom:19}).addTo(dashMap);
+      dashMarkersLayer = L.layerGroup().addTo(dashMap);
+    }catch(e){ note.textContent = 'Map failed to load: '+e.message; dashMap = null; return; }
+  }
+  dashMarkersLayer.clearLayers();
+  const pts = [];
+  let unmapped = 0;
+  open.forEach(t=>{
+    const c = parseLatLng(t.latlng);
+    if(!c){ unmapped++; return; }
+    pts.push([c.lat, c.lng]);
+    L.circleMarker([c.lat, c.lng], {radius:9, color:'#fff', weight:2, fillColor:markerColor(t), fillOpacity:0.9})
+      .bindPopup(mapPopupHtml(t)).addTo(dashMarkersLayer);
+  });
+  note.textContent = !open.length ? 'No open tickets right now.'
+    : unmapped ? unmapped + ' open ticket(s) have no valid coordinates and aren\'t shown.' : '';
+  setTimeout(()=>{
+    if(!dashMap) return;
+    dashMap.invalidateSize();
+    if(pts.length === 1) dashMap.setView(pts[0], 15);
+    else if(pts.length > 1) dashMap.fitBounds(pts, {padding:[30,30], maxZoom:15});
+  }, 40);
+}
+
+function dashInvoice(ticketId){
+  generateInvoicePDF(ticketId);
+  renderDashboard();
+}
+
+window.addEventListener('resize', ()=>{
+  clearTimeout(dashResizeTimer);
+  dashResizeTimer = setTimeout(()=>{
+    const body = document.getElementById('dashBody');
+    if(dashboardVisible() && body && body._redraw) body._redraw();
+  }, 150);
+});
 
 /* ---------- Init ---------- */
 renderIntakeSiteMapSlots();
