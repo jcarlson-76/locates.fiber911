@@ -111,7 +111,7 @@
   @media(max-width:640px){.grid{grid-template-columns:1fr;}}
 
   label{display:block;font-size:11.5px;font-weight:600;color:var(--text-mute);text-transform:uppercase;letter-spacing:.03em;margin-bottom:5px;}
-  input[type=text],input[type=number],input[type=datetime-local],select,textarea{
+  input[type=text],input[type=tel],input[type=number],input[type=datetime-local],select,textarea{
     width:100%;min-height:var(--touch);border:1px solid var(--border);border-radius:8px;
     padding:9px 11px;font-size:14.5px;color:var(--text);background:#fbfcfd;
   }
@@ -191,6 +191,16 @@
   .map-popup div{margin-bottom:2px;font-size:12.5px;}
   .map-popup button{margin-top:8px;}
   .small-note{font-size:11.5px;color:var(--text-mute);margin-top:6px;}
+
+  /* Text (SMS) */
+  #smsModal{z-index:2050;}
+  .sms-contact{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--border);font-size:14px;cursor:pointer;}
+  .sms-contact input{width:20px;height:20px;flex:none;}
+  .sms-contact .ph{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-mute);}
+  .contact-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13.5px;}
+  .contact-row .ph{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-mute);}
+  .contact-row button{margin-left:auto;min-height:30px;padding:0 10px;font-size:12px;}
+  #smsBody{min-height:150px;font-size:13.5px;line-height:1.45;}
 
   /* Dashboard */
   .dash-head{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;}
@@ -342,6 +352,14 @@
           <button class="btn btn-cyan" onclick="saveSheetsUrl()">Save</button>
         </div>
         <div class="small-note">Every device using this same URL shares the same ticket list. Enter it once per device — after that, just use "Sync Now" above.</div>
+        <label style="margin-top:14px;">Text Contacts</label>
+        <div id="contactsList"></div>
+        <div class="settings-row" style="margin-top:8px;">
+          <input type="text" id="contactName" placeholder="Name e.g. Jason Turner" style="min-width:140px;">
+          <input type="tel" id="contactPhone" placeholder="Mobile # e.g. 817-555-0123" style="min-width:150px;">
+          <button class="btn btn-cyan" onclick="addContactFromSettings()">Add</button>
+        </div>
+        <div class="small-note">People you can text tickets and routes to. Saved on this device.</div>
         <label style="margin-top:14px;">Admin</label>
         <div class="settings-row">
           <button class="btn btn-ghost" id="adminToggleBtn" onclick="toggleAdminDevice()">Unlock Admin</button>
@@ -599,6 +617,29 @@
   <div class="modal">
     <button class="modal-close" onclick="closeModal()">&times;</button>
     <div id="detailContent"></div>
+  </div>
+</div>
+
+<!-- Text (SMS) modal — opens on top of the ticket / route view -->
+<div class="modal-bg" id="smsModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeSmsModal()">&times;</button>
+    <h2 style="margin-bottom:4px;color:var(--navy);" id="smsTitle">Text</h2>
+    <div class="small-note" style="margin:0 0 12px;">Opens your phone's Messages app with this text filled in. Review it there and tap Send.</div>
+    <label>Send to</label>
+    <div id="smsContactList" style="margin-bottom:10px;"></div>
+    <div class="settings-row" style="margin-bottom:6px;">
+      <input type="text" id="smsNewName" placeholder="Name" style="min-width:100px;">
+      <input type="tel" id="smsNewPhone" placeholder="Mobile # e.g. 817-555-0123" style="min-width:150px;">
+      <button class="btn btn-ghost" onclick="smsAddFromModal()">Add</button>
+    </div>
+    <div class="small-note" style="margin-bottom:14px;">New numbers are saved to your contact list on this device.</div>
+    <label>Message (you can edit it)</label>
+    <textarea id="smsBody"></textarea>
+    <div class="row-btns" style="margin-top:10px;">
+      <button class="btn btn-cyan" style="flex:1;" onclick="smsSend()">Open in Messages</button>
+      <button class="btn btn-ghost" onclick="smsCopy()">Copy Text</button>
+    </div>
   </div>
 </div>
 
@@ -1445,6 +1486,7 @@ function openDetail(id){
         </div>` : ''}
     </div>
     <div class="row-btns" style="margin-bottom:14px;">
+      <button class="btn btn-cyan btn-block" onclick="openSmsForTicket('${t.ticketId}')">Text Ticket</button>
       <button class="btn btn-ghost btn-block" onclick="exportTicketPDF('${t.ticketId}')">Export / Print PDF</button>
       ${t.status==='completed' ? `<button class="btn btn-primary btn-block" onclick="generateInvoicePDF('${t.ticketId}')">Generate Invoice</button>` : ''}
     </div>
@@ -1540,6 +1582,7 @@ function renderRouteModal(){
     ${missing.length?`<div class="small-note" style="color:#c0392b;margin-bottom:8px;">${missing.length} stop(s) have no map coordinates and were placed last.</div>`:''}
     ${rows}
     <div class="row-btns" style="margin-top:14px;">
+      <button class="btn btn-primary" onclick="openSmsForRoute()">Text Route</button>
       <button class="btn btn-gold" onclick="window.open(googleRouteUrl(currentRouteOrder),'_blank')">Open in Google Maps</button>
       <button class="btn btn-cyan" onclick="reverseRoute()">Reverse</button>
       <button class="btn btn-ghost" onclick="copyRouteLink()">Copy Link</button>
@@ -2174,6 +2217,7 @@ function toggleSettings(){
   box.style.display = box.style.display==='none' ? 'block':'none';
   document.getElementById('sheetsUrl').value = loadSettings().sheetsUrl || '';
   document.getElementById('userName').value = loadSettings().userName || '';
+  renderContactsList();
 }
 function saveUserName(){
   const name = document.getElementById('userName').value.trim();
@@ -2873,6 +2917,155 @@ window.addEventListener('resize', ()=>{
     if(dashboardVisible() && body && body._redraw) body._redraw();
   }, 150);
 });
+
+
+/* ---------- Text tickets & routes (SMS) ---------- */
+// Uses the phone's own Messages app via an sms: link — no texting service,
+// no cost. The text is filled in; the user reviews it and taps Send there.
+let smsSelected = []; // phone numbers ticked in the current send dialog
+function loadContacts(){ return Array.isArray(loadSettings().textContacts) ? loadSettings().textContacts : []; }
+function saveContacts(list){ saveSettings({...loadSettings(), textContacts: list}); }
+// Accepts 817-555-0123, (817) 555-0123, 8175550123, +1 817..., returns +18175550123 or '' if invalid.
+function normPhone(v){
+  let d = (v||'').toString().replace(/\D/g,'');
+  if(d.length === 11 && d[0] === '1') d = d.slice(1);
+  return d.length === 10 ? '+1' + d : '';
+}
+function prettyPhone(p){
+  const d = p.replace(/\D/g,'').slice(-10);
+  return d.length === 10 ? '('+d.slice(0,3)+') '+d.slice(3,6)+'-'+d.slice(6) : p;
+}
+function addContact(name, phoneRaw){
+  const phone = normPhone(phoneRaw);
+  if(!phone){ showToast('Enter a 10-digit US mobile number'); return null; }
+  const list = loadContacts();
+  const existing = list.find(c=>c.phone === phone);
+  if(existing){
+    if(name && !existing.name){ existing.name = name; saveContacts(list); }
+    return existing;
+  }
+  const c = {name: name || prettyPhone(phone), phone};
+  list.push(c);
+  list.sort((a,b)=>a.name.localeCompare(b.name));
+  saveContacts(list);
+  return c;
+}
+function removeContact(phone){
+  saveContacts(loadContacts().filter(c=>c.phone !== phone));
+  renderContactsList();
+}
+function renderContactsList(){
+  const el = document.getElementById('contactsList');
+  if(!el) return;
+  const list = loadContacts();
+  el.innerHTML = list.length ? list.map(c=>`
+    <div class="contact-row"><span>${esc(c.name)}</span><span class="ph">${prettyPhone(c.phone)}</span>
+      <button class="btn btn-ghost" onclick="removeContact('${c.phone}')">Remove</button></div>`).join('')
+    : '<div class="small-note">No contacts yet.</div>';
+}
+function addContactFromSettings(){
+  const n = document.getElementById('contactName'), p = document.getElementById('contactPhone');
+  if(addContact(n.value.trim(), p.value)){ n.value = ''; p.value = ''; renderContactsList(); showToast('Contact saved'); }
+}
+
+// ----- message text -----
+function ticketMapLink(t){
+  const p = parseLatLng(t.latlng);
+  const q = p ? p.lat+','+p.lng : routeAddress(t);
+  return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q);
+}
+function ticketSmsText(t){
+  const lines = ['Fiber911 Locate ' + t.ticketId + (t.emergency === 'Yes' ? ' - EMERGENCY' : '')];
+  if(t.incident) lines.push('Incident #: ' + t.incident);
+  lines.push('Address: ' + routeAddress(t));
+  if(t.approxAddr) lines.push('Approx: ' + t.approxAddr);
+  if(t.description) lines.push('Work: ' + t.description);
+  const permit = [t.permit, t.permitNum].filter(Boolean).join(' ');
+  if(permit) lines.push('Permit: ' + permit);
+  lines.push('Map: ' + ticketMapLink(t));
+  const maps = [1,2,3,4].map(slot=>t[siteMapSlotFieldKey(slot,'url')]).filter(u=>u && /^https?:/i.test(u));
+  maps.forEach((u,i)=>lines.push((maps.length > 1 ? 'Site map '+(i+1) : 'Site map') + ': ' + u));
+  if(t.workOrderPdfUrl && /^https?:/i.test(t.workOrderPdfUrl)) lines.push('Work order PDF: ' + t.workOrderPdfUrl);
+  return lines.join('\n');
+}
+function routeSmsText(list){
+  const today = new Date().toLocaleDateString('en-US',{weekday:'short', month:'numeric', day:'numeric'});
+  const lines = ['Fiber911 Locate Route - ' + list.length + ' stop' + (list.length > 1 ? 's' : '') + ' (' + today + ')', ''];
+  list.forEach((t,i)=>{
+    const desc = (t.description || '').replace(/\s+/g,' ').trim();
+    lines.push((i+1) + '. ' + t.ticketId + (t.emergency === 'Yes' ? ' EMERGENCY' : '') + (t.incident ? ' (Inc ' + t.incident + ')' : ''));
+    lines.push('   ' + (t.addrNum + ' ' + t.street).trim() + (desc ? ' - ' + (desc.length > 60 ? desc.slice(0,57) + '...' : desc) : ''));
+  });
+  lines.push('', 'Directions (starts from your location):', googleRouteUrl(list));
+  return lines.join('\n');
+}
+
+// ----- dialog -----
+function openSmsModal(title, body){
+  smsSelected = [];
+  document.getElementById('smsTitle').textContent = title;
+  document.getElementById('smsBody').value = body;
+  document.getElementById('smsNewName').value = '';
+  document.getElementById('smsNewPhone').value = '';
+  renderSmsContacts();
+  document.getElementById('smsModal').classList.add('active');
+}
+function closeSmsModal(){ document.getElementById('smsModal').classList.remove('active'); }
+function openSmsForTicket(id){
+  const t = TICKETS.find(x=>x.ticketId === id);
+  if(t) openSmsModal('Text Ticket ' + t.ticketId, ticketSmsText(t));
+}
+function openSmsForRoute(){
+  if(currentRouteOrder.length) openSmsModal('Text Route — ' + currentRouteOrder.length + ' stop' + (currentRouteOrder.length > 1 ? 's' : ''), routeSmsText(currentRouteOrder));
+}
+function renderSmsContacts(){
+  const list = loadContacts();
+  document.getElementById('smsContactList').innerHTML = list.length ? list.map(c=>`
+    <label class="sms-contact" style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text);margin:0;">
+      <input type="checkbox" ${smsSelected.includes(c.phone) ? 'checked' : ''} onchange="smsToggle('${c.phone}', this.checked)">
+      <span>${esc(c.name)}</span><span class="ph">${prettyPhone(c.phone)}</span>
+    </label>`).join('')
+    : '<div class="small-note" style="margin:0 0 6px;">No saved contacts yet — add a number below.</div>';
+}
+function smsToggle(phone, on){
+  smsSelected = smsSelected.filter(p=>p !== phone);
+  if(on) smsSelected.push(phone);
+}
+function smsAddFromModal(){
+  const n = document.getElementById('smsNewName'), p = document.getElementById('smsNewPhone');
+  const c = addContact(n.value.trim(), p.value);
+  if(!c) return;
+  if(!smsSelected.includes(c.phone)) smsSelected.push(c.phone);
+  n.value = ''; p.value = '';
+  renderSmsContacts();
+}
+// iPhone/iPad/Mac Messages and Android use slightly different sms: link formats.
+function smsUrl(numbers, body){
+  const b = encodeURIComponent(body);
+  const apple = /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel');
+  if(apple){
+    return numbers.length > 1
+      ? 'sms:/open?addresses=' + numbers.join(',') + '&body=' + b
+      : 'sms:' + numbers[0] + '&body=' + b;
+  }
+  return 'sms:' + numbers.join(',') + '?body=' + b;
+}
+function smsSend(){
+  // A number typed but not yet added counts too.
+  const typed = document.getElementById('smsNewPhone').value.trim();
+  if(typed){ smsAddFromModal(); if(document.getElementById('smsNewPhone').value.trim()) return; }
+  if(!smsSelected.length){ showToast('Pick at least one person to text'); return; }
+  const body = document.getElementById('smsBody').value.trim();
+  if(!body){ showToast('The message is empty'); return; }
+  logDebug('Opening Messages for '+smsSelected.length+' recipient(s)');
+  window.location.href = smsUrl(smsSelected, body);
+  closeSmsModal();
+}
+function smsCopy(){
+  const body = document.getElementById('smsBody').value;
+  if(navigator.clipboard) navigator.clipboard.writeText(body).then(()=>showToast('Text copied — paste it into any message'), ()=>prompt('Copy this text:', body));
+  else prompt('Copy this text:', body);
+}
 
 /* ---------- Admin-only features ---------- */
 // No logins in this app, so admin access is unlocked per device with the
