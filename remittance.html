@@ -111,11 +111,15 @@ a.jump:hover{text-decoration:underline}
 .note{font-size:13px;color:var(--muted)}
 .toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;max-width:calc(100% - 32px)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+nav.top{display:flex;gap:4px;flex-wrap:wrap}
+nav.top a{font:600 13px var(--f-body);color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px}
+nav.top a[aria-current]{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
 </style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 <div class="wrap">
+  <nav class="top" aria-label="Pages"><a href="remittance.html" aria-current="page">Remittance Log</a><a href="dashboard.html">Dashboard</a></nav>
   <header>
     <div>
       <h1>Remittance Master Log</h1>
