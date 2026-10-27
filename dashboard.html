@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Fiber911 Revenue Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+/* Layout: summary tiles first, then a two-column grid of charts, then the open-invoice worklist and exceptions. */
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --sunk:#e8ecea; --line:#d3dad7; --grid:#e6ebe9;
+  --ink:#14211d; --muted:#5b6b66; --accent:#0d6b5e; --accent-ink:#ffffff;
+  --s-invoiced:#5b6fc4; --s-received:#0d8a78;
+  --ok:#1f7a3f; --ok-bg:#e2f2e6; --warn:#9a5b00; --warn-bg:#fbefd9; --serious:#c2410c; --bad:#b4232c; --bad-bg:#fbe3e4;
+  --f-display:"Archivo",system-ui,sans-serif; --f-body:"IBM Plex Sans",system-ui,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1614; --surface:#17211e; --sunk:#111a17; --line:#2a3833; --grid:#22302b; --ink:#e3ebe8; --muted:#93a59f;
+  --accent:#3cbfa8; --accent-ink:#06201b; --s-invoiced:#7584e0; --s-received:#1f9e89;
+  --ok:#6fd08f; --ok-bg:#163223; --warn:#f0b24f; --warn-bg:#33270f; --serious:#fb8a4c; --bad:#ff7d84; --bad-bg:#3a1a1d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1614; --surface:#17211e; --sunk:#111a17; --line:#2a3833; --grid:#22302b; --ink:#e3ebe8; --muted:#93a59f;
+  --accent:#3cbfa8; --accent-ink:#06201b; --s-invoiced:#7584e0; --s-received:#1f9e89;
+  --ok:#6fd08f; --ok-bg:#163223; --warn:#f0b24f; --warn-bg:#33270f; --serious:#fb8a4c; --bad:#ff7d84; --bad-bg:#3a1a1d; color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body)}
+[hidden]{display:none!important}
+.wrap{max-width:1180px;margin:0 auto;padding:16px 16px 56px;padding-top:calc(16px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:20px}
+nav.top{display:flex;gap:4px;flex-wrap:wrap}
+nav.top a{font:600 13px var(--f-body);color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px}
+nav.top a[aria-current]{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{font:800 clamp(24px,5vw,32px)/1.1 var(--f-display);margin:0;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0;font-size:14px;max-width:65ch}
+h2{font:600 15px/1.2 var(--f-display);margin:0}
+.eyebrow{font:600 11px var(--f-body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+button,.btn{font:600 14px var(--f-body);border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:9px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+button:hover,.btn:hover{border-color:var(--accent)}
+button:focus-visible,.btn:focus-within,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button[disabled]{opacity:.5;cursor:not-allowed}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.status{font-size:13px;color:var(--muted);margin:0}
+.status.bad{color:var(--bad)}
+
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.kpi{padding:14px 16px;border-left:1px solid var(--line);min-width:0;display:flex;flex-direction:column;gap:2px}
+.kpi:first-child{border-left:0}
+.kpi b{font:500 clamp(19px,3.4vw,26px)/1.15 var(--f-mono);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.kpi small{font-size:12.5px;color:var(--muted)}
+.kpi.alert b{color:var(--bad)}
+.kpi.warnish b{color:var(--warn)}
+.delta.up{color:var(--ok)} .delta.down{color:var(--bad)}
+@media (max-width:900px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi{border-left:0;border-top:1px solid var(--line)}.kpi:nth-child(even){border-left:1px solid var(--line)}.kpi:nth-child(-n+2){border-top:0}.kpi:last-child:nth-child(odd){grid-column:1/-1}}
+
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.grid .wide{grid-column:1/-1}
+@media (max-width:820px){.grid{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:8px}
+.card-head p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.chartbox{position:relative;height:260px}
+.chartbox.tall{height:300px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;padding:2px;background:var(--sunk);gap:2px}
+.seg button{border:0;background:transparent;padding:5px 10px;border-radius:6px;font-size:13px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.empty{padding:28px 12px;text-align:center;color:var(--muted);font-size:14px;border:1px dashed var(--line);border-radius:10px;background:var(--sunk)}
+.empty button{margin-top:10px}
+
+.aging{display:flex;flex-direction:column;gap:10px}
+.age-row{display:grid;grid-template-columns:88px minmax(0,1fr) 112px;gap:10px;align-items:center;font-size:14px}
+.age-bar{height:22px;background:var(--sunk);border-radius:4px;overflow:hidden}
+.age-bar i{display:block;height:100%;border-radius:0 4px 4px 0;min-width:2px}
+.age-row .num{text-align:right;white-space:nowrap}
+.age-row small{color:var(--muted);display:block;text-align:right}
+
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font:600 11px var(--f-body);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:var(--sunk);position:sticky;top:0}
+th.sort{cursor:pointer;user-select:none}
+th.sort:hover{color:var(--ink)}
+td.r,th.r{text-align:right}
+tr:last-child td{border-bottom:0}
+.pill{display:inline-flex;align-items:center;gap:4px;font:600 11px/1 var(--f-body);text-transform:uppercase;letter-spacing:.05em;padding:4px 7px;border-radius:99px;white-space:nowrap}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.bad{background:var(--bad-bg);color:var(--bad)}
+.pill.neutral{background:var(--sunk);color:var(--muted)}
+input[type=search],input[type=date],select{font:14px var(--f-body);padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);min-width:0;max-width:100%}
+input[type=search]{width:220px}
+.mapper{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.mapper label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600}
+.note{font-size:13px;color:var(--muted);margin:0;max-width:75ch}
+.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;max-width:calc(100% - 32px);z-index:9}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="top" aria-label="Pages">
+    <a href="/remittance">Remittance Log</a>
+    <a href="/dashboard" aria-current="page">Dashboard</a>
+  </nav>
+
+  <header>
+    <div>
+      <h1>Revenue Dashboard</h1>
+      <p class="sub">Payments come from your Remittance Master Log. Amounts owed come from the invoices you've submitted.</p>
+    </div>
+    <div class="tools">
+      <button id="driveBtn" type="button" class="primary">Connect Google Drive</button>
+      <label class="btn" for="invIn">Upload invoices<input id="invIn" type="file" accept=".csv,text/csv" multiple hidden></label>
+    </div>
+  </header>
+  <p class="status" id="driveStatus">Loading…</p>
+
+  <section class="card" id="mapCard" hidden>
+    <div class="card-head"><div><h2>Match the columns in <span id="mapFile"></span></h2><p>I couldn't tell which columns hold the invoice details. Pick them once and I'll load the file.</p></div></div>
+    <div class="mapper" id="mapper"></div>
+    <div class="tools"><button type="button" class="primary" id="mapGo">Load invoices</button><button type="button" id="mapCancel">Cancel</button></div>
+  </section>
+
+  <section class="kpis" aria-label="Summary">
+    <div class="kpi"><span class="eyebrow">Received this month</span><b id="kMonth">$0.00</b><small id="kMonthD">&nbsp;</small></div>
+    <div class="kpi"><span class="eyebrow">Received this year</span><b id="kYtd">$0.00</b><small id="kYtdN">&nbsp;</small></div>
+    <div class="kpi" id="kOwedBox"><span class="eyebrow">Amount owed</span><b id="kOwed">—</b><small id="kOwedN">Upload invoices to see this</small></div>
+    <div class="kpi" id="kOverBox"><span class="eyebrow">Past due</span><b id="kOver">—</b><small id="kOverN">&nbsp;</small></div>
+    <div class="kpi"><span class="eyebrow">Avg days to pay</span><b id="kDays">—</b><small id="kDaysN">&nbsp;</small></div>
+  </section>
+
+  <section class="grid">
+    <article class="card wide">
+      <div class="card-head">
+        <div><h2>Weekly revenue</h2><p id="wkSub">Invoiced vs received, weeks starting Monday</p></div>
+        <div class="tools">
+          <div class="legend"><span><i style="background:var(--s-invoiced)"></i>Invoiced</span><span><i style="background:var(--s-received)"></i>Received</span></div>
+          <div class="seg" role="group" aria-label="Weeks shown"><button type="button" data-wk="13" aria-pressed="false">13 wk</button><button type="button" data-wk="26" aria-pressed="true">26 wk</button><button type="button" data-wk="52" aria-pressed="false">52 wk</button></div>
+        </div>
+      </div>
+      <div class="chartbox tall"><canvas id="cWeek" aria-label="Weekly invoiced and received"></canvas></div>
+    </article>
+
+    <article class="card">
+      <div class="card-head">
+        <div><h2>Monthly revenue</h2><p>Last 12 months</p></div>
+        <div class="legend"><span><i style="background:var(--s-invoiced)"></i>Invoiced</span><span><i style="background:var(--s-received)"></i>Received</span></div>
+      </div>
+      <div class="chartbox"><canvas id="cMonth" aria-label="Monthly invoiced and received"></canvas></div>
+    </article>
+
+    <article class="card">
+      <div class="card-head"><div><h2>Amount owed over time</h2><p>Submitted minus paid, at the end of each week</p></div></div>
+      <div class="chartbox" id="owedBox"><canvas id="cOwed" aria-label="Amount owed over time"></canvas></div>
+    </article>
+
+    <article class="card">
+      <div class="card-head"><div><h2>What's owed, by age</h2><p id="agingSub">Days since the invoice date</p></div></div>
+      <div class="aging" id="aging"></div>
+    </article>
+
+    <article class="card">
+      <div class="card-head"><div><h2>Days to get paid</h2><p>Average days from invoice date to payment, per remittance</p></div></div>
+      <div class="chartbox"><canvas id="cDays" aria-label="Days to get paid per payment"></canvas></div>
+    </article>
+
+    <article class="card wide">
+      <div class="card-head">
+        <div><h2>Unpaid invoices</h2><p id="openSub">Oldest first</p></div>
+        <div class="tools">
+          <label class="note" for="since" style="display:flex;align-items:center;gap:6px">Track from <input type="date" id="since"></label>
+          <input type="search" id="q" placeholder="Find invoice or customer" aria-label="Find invoice or customer">
+        </div>
+      </div>
+      <div class="tablebox" id="openTable"></div>
+      <p class="note">Invoices dated before the “Track from” date are left out, since they may have been paid before the remittance log started. It defaults to the oldest invoice that shows up on a remittance. If an invoice has no due date, it's treated as due 30 days after the invoice date.</p>
+    </article>
+
+    <article class="card wide" id="excCard" hidden>
+      <div class="card-head"><div><h2>Needs a look</h2><p>Payments that don't line up with the invoices you submitted</p></div></div>
+      <div class="tablebox" id="excTable"></div>
+    </article>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+// ================= SETTINGS =================
+const GOOGLE_CLIENT_ID = '618361856688-99c1b2keignk9n4vq7ukirvlbqqn180o.apps.googleusercontent.com';
+const REMIT_FILE = 'Remittance Master Log.json';   // written by the Remittance Log page
+const INV_FILE   = 'Invoice Register.json';        // written by this page
+const NET_DAYS   = 30;                             // used when an invoice has no due date
+// ============================================
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const cents = n => Math.round(Number(n||0)*100);
+const money = n => (n<0?'-':'')+'$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const money0 = n => (n<0?'-':'')+'$'+Math.abs(Math.round(n)).toLocaleString('en-US');
+const short = n => { const a=Math.abs(n); return (n<0?'-':'')+'$'+(a>=1e6?(a/1e6).toFixed(1)+'M':a>=1e3?(a/1e3).toFixed(a>=1e4?0:1)+'k':Math.round(a)) };
+function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,3600)}
+const DAY=864e5;
+const today = (()=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate())})();
+const isoOf = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const dateOf = iso => { const m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m?new Date(+m[1],m[2]-1,+m[3]):null };
+const usDate = iso => { const m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m?`${m[2]}/${m[3]}/${m[1]}`:'' };
+function toISO(v){
+  const s=String(v||'').trim(); if(!s) return '';
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/); if(m){let y=+m[3]; if(y<100)y+=2000; return `${y}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`}
+  const d=new Date(s); return isNaN(d)?'':isoOf(d);
+}
+const num = v => { const s=String(v??'').replace(/[$,\s]/g,''); const neg=/^\(.*\)$/.test(s)||/^-/.test(s); const n=parseFloat(s.replace(/[()\-]/g,'')); return isNaN(n)?0:(neg?-n:n) };
+// INV-13743, 13743, inv 13743 all match. INV-13669-B stays distinct from 13669.
+const keyOf = inv => String(inv||'').toUpperCase().replace(/[^A-Z0-9]/g,'').replace(/^INV(OICE)?/,'');
+const weekStart = d => { const x=new Date(d); const k=(x.getDay()+6)%7; x.setDate(x.getDate()-k); return x };
+
+// ---------- state ----------
+const REMIT_KEY='remittanceMasterLog.v1', INV_KEY='invoiceRegister.v1', SINCE_KEY='dashboard.since';
+let remits=[], invoices={}, weeks=26, sortBy={col:'age',dir:-1};
+try{ remits=Object.values(JSON.parse(localStorage.getItem(REMIT_KEY))||{}) }catch(e){}
+try{ invoices=JSON.parse(localStorage.getItem(INV_KEY))||{} }catch(e){}
+let since=''; try{since=localStorage.getItem(SINCE_KEY)||''}catch(e){}
+function saveInvLocal(){ try{localStorage.setItem(INV_KEY,JSON.stringify(invoices))}catch(e){} }
+
+// ---------- CSV ----------
+function parseCSV(text){
+  text=text.replace(/^﻿/,''); const rows=[]; let row=[],f='',q=false;
+  for(let i=0;i<text.length;i++){const c=text[i];
+    if(q){ if(c=='"'){ if(text[i+1]=='"'){f+='"';i++} else q=false } else f+=c }
+    else if(c=='"') q=true; else if(c==','){row.push(f);f=''}
+    else if(c=='\n'||c=='\r'){ if(c=='\r'&&text[i+1]=='\n')i++; row.push(f);f=''; if(row.some(v=>v.trim()))rows.push(row); row=[] }
+    else f+=c }
+  row.push(f); if(row.some(v=>v.trim()))rows.push(row); return rows;
+}
+const SYN={
+  num:['invoice number','invoice #','invoice no','invoice no.','invoice','num','no.','number','doc number','document number','document reference','ref no','invoice id','reference'],
+  date:['invoice date','date','txn date','transaction date','issue date','issued','created','date issued'],
+  amount:['invoice total','total','amount','total amount','original amount','grand total','invoice amount','amount due'],
+  due:['due date','due','date due'],
+  customer:['customer','customer name','client','client name','bill to','name','customer/project'],
+  balance:['open balance','balance','balance due','amount open','outstanding','amount outstanding']
+};
+const norm = h => String(h||'').trim().toLowerCase().replace(/\s+/g,' ');
+function detect(head){
+  const h=head.map(norm), used=new Set(), idx={};
+  for(const k of ['num','date','due','customer','balance','amount']){
+    idx[k]=-1;
+    for(const s of SYN[k]){ const i=h.findIndex((x,j)=>x===s&&!used.has(j)); if(i>=0){idx[k]=i;used.add(i);break} }
+  }
+  return idx;
+}
+function findHeader(rows){
+  for(let i=0;i<Math.min(rows.length,15);i++){ const d=detect(rows[i]); if(d.num>=0&&d.amount>=0) return {at:i,idx:d} }
+  return null;
+}
+function rowsToInvoices(rows,at,idx,file){
+  let added=0,updated=0,skipped=0;
+  for(const r of rows.slice(at+1)){
+    const g=k=>idx[k]>=0?(r[idx[k]]??'').trim():'';
+    const n=g('num'); const amt=num(g('amount'));
+    if(!n||/^total/i.test(n)||/^total/i.test(r[0]||'')||!keyOf(n)){skipped++;continue}
+    const key=keyOf(n);
+    const rec={num:n,date:toISO(g('date')),amount:amt,due:toISO(g('due')),customer:g('customer'),balance:idx.balance>=0?num(g('balance')):null,file,importedAt:new Date().toISOString()};
+    if(invoices[key]) updated++; else added++;
+    invoices[key]=rec;
+  }
+  return {added,updated,skipped};
+}
+let pending=[];
+async function handleInvoiceFiles(files){
+  for(const file of files){
+    const rows=parseCSV(await file.text());
+    if(rows.length<2){toast(`${file.name} has no rows.`);continue}
+    const hd=findHeader(rows);
+    if(hd&&hd.idx.date>=0){ const r=rowsToInvoices(rows,hd.at,hd.idx,file.name); afterImport(file.name,r) }
+    else pending.push({file,rows});
+  }
+  if(pending.length) showMapper();
+}
+function afterImport(name,r){
+  saveInvLocal(); render(); queueSave();
+  toast(`${name}: ${r.added} added${r.updated?`, ${r.updated} updated`:''}`);
+}
+function showMapper(){
+  const {file,rows}=pending[0]; const head=rows[0];
+  $('mapFile').textContent=file.name; $('mapCard').hidden=false;
+  const d=detect(head);
+  const opts=sel=>'<option value="-1">— none —</option>'+head.map((h,i)=>`<option value="${i}"${i===sel?' selected':''}>${esc(h||'Column '+(i+1))}</option>`).join('');
+  const f=[['num','Invoice number',true],['date','Invoice date',true],['amount','Invoice amount',true],['customer','Customer',false],['due','Due date',false]];
+  $('mapper').innerHTML=f.map(([k,l,req])=>`<label for="map_${k}">${l}${req?'':' (optional)'}<select id="map_${k}">${opts(d[k])}</select></label>`).join('');
+  $('mapCard').scrollIntoView({block:'start'});
+}
+$('mapGo').addEventListener('click',()=>{
+  const idx={balance:-1}; for(const k of ['num','date','amount','customer','due']) idx[k]=+$('map_'+k).value;
+  if(idx.num<0||idx.date<0||idx.amount<0){toast('Pick the invoice number, date and amount columns.');return}
+  const {file,rows}=pending.shift(); const r=rowsToInvoices(rows,0,idx,file.name); afterImport(file.name,r);
+  if(pending.length) showMapper(); else $('mapCard').hidden=true;
+});
+$('mapCancel').addEventListener('click',()=>{pending.shift(); if(pending.length) showMapper(); else $('mapCard').hidden=true});
+$('invIn').addEventListener('change',e=>{handleInvoiceFiles([...e.target.files]);e.target.value=''});
+
+// ---------- analysis ----------
+function analyze(){
+  // payments per invoice
+  const paid={};
+  let firstInvISO='';
+  for(const p of remits) for(const l of (p.lines||[])){
+    const k=keyOf(l.inv); (paid[k] ||= {amt:0,disc:0,last:'',refs:[],inv:l.inv,invDate:l.invDateISO});
+    paid[k].amt+=cents(l.paid); paid[k].disc+=cents(l.disc);
+    if(p.dateISO>paid[k].last) paid[k].last=p.dateISO; paid[k].refs.push(p.ref);
+    if(l.invDateISO&&(!firstInvISO||l.invDateISO<firstInvISO)) firstInvISO=l.invDateISO;
+  }
+  const from=since||firstInvISO||'';
+  const list=Object.entries(invoices).map(([k,v])=>{
+    const p=paid[k]; const amt=cents(v.amount); const got=p?p.amt+p.disc:0;
+    const owed=Math.max(0,amt-got);
+    const d=dateOf(v.date); const due=v.due?dateOf(v.due):(d?new Date(d.getTime()+NET_DAYS*DAY):null);
+    const age=d?Math.round((today-d)/DAY):null;
+    const late=due?Math.round((today-due)/DAY):null;
+    const status=owed===0?'paid':got>0?'partial':(late!==null&&late>0?'late':'open');
+    return {key:k,...v,amtC:amt,paidC:p?p.amt:0,owed,age,late,dueISO:due?isoOf(due):'',status,inScope:!from||!v.date||v.date>=from,refs:p?p.refs:[]};
+  });
+  const exceptions=[];
+  for(const [k,p] of Object.entries(paid)){
+    const inv=invoices[k];
+    if(!inv&&Object.keys(invoices).length) exceptions.push({inv:p.inv,what:'Paid, but not in your invoice upload',amt:p.amt,refs:p.refs});
+    else if(inv&&p.amt+p.disc>cents(inv.amount)) exceptions.push({inv:p.inv,what:`Paid ${money((p.amt+p.disc-cents(inv.amount))/100)} more than invoiced`,amt:p.amt,refs:p.refs});
+    if(p.refs.length>1&&new Set(p.refs).size>1) exceptions.push({inv:p.inv,what:'Paid on more than one remittance',amt:p.amt,refs:p.refs});
+  }
+  for(const i of list) if(i.inScope&&i.status==='partial') exceptions.push({inv:i.num,what:`Short paid, ${money(i.owed/100)} still owed`,amt:i.paidC,refs:i.refs});
+  return {list,paid,from,exceptions};
+}
+
+// ---------- charts ----------
+const charts={};
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function baseOpts(fmtY){
+  return {
+    responsive:true, maintainAspectRatio:false, animation:matchMedia('(prefers-reduced-motion: reduce)').matches?false:{duration:300},
+    interaction:{mode:'index',intersect:false},
+    plugins:{legend:{display:false},tooltip:{backgroundColor:css('--ink'),titleColor:css('--bg'),bodyColor:css('--bg'),padding:10,cornerRadius:6,
+      titleFont:{family:"'IBM Plex Sans',system-ui,sans-serif",weight:'600'},bodyFont:{family:"'IBM Plex Mono',ui-monospace,Menlo,monospace"},boxPadding:4,
+      callbacks:{label:c=>` ${c.dataset.label}: ${fmtY(c.parsed.y)}`}}},
+    scales:{
+      x:{grid:{display:false},border:{color:css('--line')},ticks:{color:css('--muted'),font:{family:"'IBM Plex Sans',system-ui,sans-serif",size:11},maxRotation:0,autoSkipPadding:10}},
+      y:{beginAtZero:true,grid:{color:css('--grid')},border:{display:false},ticks:{color:css('--muted'),font:{family:"'IBM Plex Mono',ui-monospace,Menlo,monospace",size:11},callback:v=>short(v),maxTicksLimit:6}}
+    }
+  };
+}
+function draw(id,cfg){ if(charts[id]) charts[id].destroy(); charts[id]=new Chart($(id),cfg) }
+const bar = (label,data,color) => ({label,data,backgroundColor:color,hoverBackgroundColor:color,borderRadius:{topLeft:4,topRight:4},borderSkipped:'bottom',maxBarThickness:28,categoryPercentage:.72,barPercentage:.9});
+
+function renderCharts(a){
+  if(!window.Chart) return;
+  const inv=css('--s-invoiced'), rec=css('--s-received');
+  const hasInv=Object.keys(invoices).length>0;
+
+  // weekly
+  const ws=weekStart(today); const wk=[];
+  for(let i=weeks-1;i>=0;i--){ const d=new Date(ws); d.setDate(d.getDate()-7*i); wk.push(d) }
+  const wIdx=new Map(wk.map((d,i)=>[isoOf(d),i]));
+  const wInv=wk.map(()=>0), wRec=wk.map(()=>0);
+  for(const p of remits){ const d=dateOf(p.dateISO); if(!d) continue; const i=wIdx.get(isoOf(weekStart(d))); if(i!==undefined) wRec[i]+=cents(p.amount)/100 }
+  for(const v of Object.values(invoices)){ const d=dateOf(v.date); if(!d) continue; const i=wIdx.get(isoOf(weekStart(d))); if(i!==undefined) wInv[i]+=cents(v.amount)/100 }
+  const wLab=wk.map(d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+  const wds=[]; if(hasInv) wds.push(bar('Invoiced',wInv,inv)); wds.push(bar('Received',wRec,rec));
+  const wo=baseOpts(money); wo.plugins.tooltip.callbacks.title=c=>'Week of '+wk[c[0].dataIndex].toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  draw('cWeek',{type:'bar',data:{labels:wLab,datasets:wds},options:wo});
+  const wTot=wRec.reduce((s,x)=>s+x,0);
+  $('wkSub').textContent=`${money0(wTot)} received in the last ${weeks} weeks${hasInv?` · ${money0(wInv.reduce((s,x)=>s+x,0))} invoiced`:''}`;
+
+  // monthly
+  const ms=[]; for(let i=11;i>=0;i--) ms.push(new Date(today.getFullYear(),today.getMonth()-i,1));
+  const mKey=d=>d.getFullYear()*12+d.getMonth(); const mIdx=new Map(ms.map((d,i)=>[mKey(d),i]));
+  const mInv=ms.map(()=>0), mRec=ms.map(()=>0);
+  for(const p of remits){ const d=dateOf(p.dateISO); if(d){const i=mIdx.get(mKey(d)); if(i!==undefined) mRec[i]+=cents(p.amount)/100} }
+  for(const v of Object.values(invoices)){ const d=dateOf(v.date); if(d){const i=mIdx.get(mKey(d)); if(i!==undefined) mInv[i]+=cents(v.amount)/100} }
+  const mds=[]; if(hasInv) mds.push(bar('Invoiced',mInv,inv)); mds.push(bar('Received',mRec,rec));
+  const mo=baseOpts(money); mo.plugins.tooltip.callbacks.title=c=>ms[c[0].dataIndex].toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  draw('cMonth',{type:'bar',data:{labels:ms.map(d=>d.toLocaleDateString('en-US',{month:'short'})+(d.getMonth()===0?" '"+String(d.getFullYear()).slice(2):'')),datasets:mds},options:mo});
+
+  // owed over time
+  const ob=$('owedBox');
+  if(!hasInv){ ob.innerHTML='<div class="empty">Upload your submitted invoices to track what\'s owed over time.</div>'; if(charts.cOwed){charts.cOwed.destroy();delete charts.cOwed} }
+  else{
+    if(!$('cOwed')) ob.innerHTML='<canvas id="cOwed" aria-label="Amount owed over time"></canvas>';
+    const scope=a.list.filter(i=>i.inScope&&i.date);
+    const pays=[]; for(const p of remits) for(const l of (p.lines||[])){ const k=keyOf(l.inv); if(invoices[k]&&scope.some(s=>s.key===k)) pays.push({d:p.dateISO,c:cents(l.paid)+cents(l.disc)}) }
+    const ends=wk.map(d=>{const e=new Date(d);e.setDate(e.getDate()+6);return e>today?today:e});
+    const owed=ends.map(e=>{const iso=isoOf(e);
+      const billed=scope.filter(s=>s.date<=iso).reduce((t,s)=>t+s.amtC,0);
+      const got=pays.filter(p=>p.d<=iso).reduce((t,p)=>t+p.c,0);
+      return Math.max(0,billed-got)/100});
+    const oo=baseOpts(money); oo.plugins.tooltip.callbacks.title=c=>'As of '+ends[c[0].dataIndex].toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    draw('cOwed',{type:'line',data:{labels:wLab,datasets:[{label:'Owed',data:owed,borderColor:inv,backgroundColor:inv+'22',fill:'origin',borderWidth:2,tension:.25,pointRadius:ctx=>ctx.dataIndex===owed.length-1?4:0,pointHoverRadius:5,pointBackgroundColor:inv,pointBorderColor:css('--surface'),pointBorderWidth:2}]},options:oo});
+  }
+
+  // days to pay per remittance
+  const dp=remits.filter(p=>p.dateISO&&(p.lines||[]).length).map(p=>{
+    const pd=dateOf(p.dateISO); let w=0,t=0;
+    for(const l of p.lines){const d=dateOf(l.invDateISO); if(!d) continue; const c=Math.max(1,cents(l.paid)); w+=c; t+=c*((pd-d)/DAY)}
+    return {iso:p.dateISO,ref:p.ref,days:w?Math.round(t/w):null};
+  }).filter(x=>x.days!==null).sort((x,y)=>x.iso.localeCompare(y.iso)).slice(-26);
+  const dO=baseOpts(v=>Math.round(v)+' days'); dO.scales.y.ticks.callback=v=>v+'d';
+  dO.plugins.tooltip.callbacks.title=c=>`Paid ${usDate(dp[c[0].dataIndex].iso)} · ref ${dp[c[0].dataIndex].ref}`;
+  draw('cDays',{type:'line',data:{labels:dp.map(x=>dateOf(x.iso).toLocaleDateString('en-US',{month:'short',day:'numeric'})),
+    datasets:[{label:'Days to pay',data:dp.map(x=>x.days),borderColor:rec,backgroundColor:rec,borderWidth:2,tension:.2,pointRadius:4,pointHoverRadius:6,pointBorderColor:css('--surface'),pointBorderWidth:2}]},options:dO});
+}
+
+// ---------- render ----------
+function render(){
+  const a=analyze(); const hasInv=Object.keys(invoices).length>0;
+  if(!$('since').value&&a.from) $('since').value=a.from;
+
+  // KPIs
+  const m0=new Date(today.getFullYear(),today.getMonth(),1), mPrev=new Date(today.getFullYear(),today.getMonth()-1,1);
+  const dayN=today.getDate(); const prevSame=new Date(mPrev.getFullYear(),mPrev.getMonth(),Math.min(dayN,new Date(today.getFullYear(),today.getMonth(),0).getDate()));
+  let thisM=0,prevM=0,ytd=0,ytdN=0;
+  for(const p of remits){const d=dateOf(p.dateISO); if(!d) continue; const c=cents(p.amount);
+    if(d>=m0&&d<=today) thisM+=c; if(d>=mPrev&&d<=prevSame) prevM+=c;
+    if(d.getFullYear()===today.getFullYear()&&d<=today){ytd+=c;ytdN++}}
+  $('kMonth').textContent=money(thisM/100);
+  const dl=$('kMonthD');
+  if(prevM){const pct=Math.round((thisM-prevM)/prevM*100); dl.innerHTML=`<span class="delta ${pct>=0?'up':'down'}">${pct>=0?'▲':'▼'} ${Math.abs(pct)}%</span> vs same point last month`}
+  else dl.textContent=thisM?'Nothing by this point last month':'No payments yet this month';
+  $('kYtd').textContent=money(ytd/100); $('kYtdN').textContent=`${ytdN} payment${ytdN!==1?'s':''} in ${today.getFullYear()}`;
+
+  const open=a.list.filter(i=>i.inScope&&i.owed>0);
+  const late=open.filter(i=>i.late!==null&&i.late>0);
+  if(hasInv){
+    const ow=open.reduce((s,i)=>s+i.owed,0), lt=late.reduce((s,i)=>s+i.owed,0);
+    $('kOwed').textContent=money(ow/100); $('kOwedN').textContent=`${open.length} unpaid invoice${open.length!==1?'s':''}`;
+    $('kOver').textContent=money(lt/100); $('kOverN').textContent=late.length?`${late.length} past due · oldest ${Math.max(...late.map(i=>i.late))} days late`:'Nothing past due';
+    $('kOverBox').classList.toggle('alert',lt>0); $('kOwedBox').classList.toggle('warnish',ow>0);
+  } else {
+    $('kOwed').textContent='—'; $('kOwedN').innerHTML='Upload invoices to see this'; $('kOver').textContent='—'; $('kOverN').innerHTML='&nbsp;';
+    $('kOverBox').classList.remove('alert'); $('kOwedBox').classList.remove('warnish');
+  }
+  // avg days to pay, last 90 days of payments, weighted by amount
+  let w=0,t=0; const cut=new Date(today.getTime()-90*DAY);
+  for(const p of remits){const pd=dateOf(p.dateISO); if(!pd||pd<cut) continue; for(const l of (p.lines||[])){const d=dateOf(l.invDateISO); if(!d) continue; const c=Math.max(1,cents(l.paid)); w+=c; t+=c*((pd-d)/DAY)}}
+  $('kDays').textContent=w?Math.round(t/w)+' days':'—'; $('kDaysN').textContent=w?'Payments in the last 90 days':'No recent payments';
+
+  // aging
+  const B=[{l:'0–30 days',max:30,c:'--ok'},{l:'31–60 days',max:60,c:'--warn'},{l:'61–90 days',max:90,c:'--serious'},{l:'90+ days',max:1e9,c:'--bad'}];
+  if(!hasInv) $('aging').innerHTML='<div class="empty">Upload your submitted invoices to see what\'s owed and how old it is.<br><button type="button" class="primary" data-upload>Upload invoices</button></div>';
+  else if(!open.length) $('aging').innerHTML='<div class="empty">Everything submitted since '+esc(usDate(a.from))+' has been paid.</div>';
+  else{
+    const bk=B.map(b=>({...b,amt:0,n:0}));
+    for(const i of open){const ag=i.age??0; const b=bk.find(b=>ag<=b.max); b.amt+=i.owed; b.n++}
+    const mx=Math.max(...bk.map(b=>b.amt),1);
+    $('aging').innerHTML=bk.map(b=>`<div class="age-row"><span>${b.l}</span><div class="age-bar" title="${b.l}: ${money(b.amt/100)}"><i style="width:${b.amt?Math.max(1,b.amt/mx*100):0}%;background:var(${b.c})"></i></div><span class="num">${money(b.amt/100)}<small>${b.n} invoice${b.n!==1?'s':''}</small></span></div>`).join('');
+    $('agingSub').textContent=`Days since the invoice date · ${money(open.reduce((s,i)=>s+i.owed,0)/100)} total`;
+  }
+
+  // open table
+  const q=$('q').value.trim().toLowerCase();
+  let rows=open.filter(i=>!q||i.num.toLowerCase().includes(q)||(i.customer||'').toLowerCase().includes(q));
+  const sv={inv:i=>i.key.padStart(12,'0'),date:i=>i.date||'',due:i=>i.dueISO||'',amount:i=>i.amtC,owed:i=>i.owed,age:i=>i.age??-1,cust:i=>(i.customer||'').toLowerCase()};
+  rows.sort((x,y)=>{const f=sv[sortBy.col]; const a1=f(x),b1=f(y); return (a1>b1?1:a1<b1?-1:0)*sortBy.dir});
+  const hasCust=open.some(i=>i.customer);
+  const th=(c,l,r)=>`<th class="sort${r?' r':''}" data-sort="${c}" aria-sort="${sortBy.col===c?(sortBy.dir>0?'ascending':'descending'):'none'}">${l}${sortBy.col===c?(sortBy.dir>0?' ↑':' ↓'):''}</th>`;
+  if(!hasInv) $('openTable').innerHTML='<div class="empty" style="border:0">No invoices uploaded yet. Export your invoice list as a CSV (invoice number, date and amount at minimum) and upload it here.<br><button type="button" class="primary" data-upload>Upload invoices</button></div>';
+  else if(!rows.length) $('openTable').innerHTML=`<div class="empty" style="border:0">${q?`Nothing unpaid matches “${esc(q)}”.`:'No unpaid invoices.'}</div>`;
+  else $('openTable').innerHTML=`<table><thead><tr>${th('inv','Invoice')}${hasCust?th('cust','Customer'):''}${th('date','Invoice date')}${th('due','Due')}${th('amount','Amount',1)}<th class="r">Paid</th>${th('owed','Owed',1)}${th('age','Age',1)}<th>Status</th></tr></thead><tbody>${
+    rows.map(i=>{const st=i.status==='partial'?'<span class="pill warn">Short paid</span>':i.status==='late'?`<span class="pill bad">${i.late}d late</span>`:'<span class="pill neutral">Open</span>';
+      return `<tr><td class="num">${esc(i.num)}</td>${hasCust?`<td>${esc(i.customer)}</td>`:''}<td class="num">${usDate(i.date)}</td><td class="num">${usDate(i.dueISO)}</td><td class="r num">${money(i.amtC/100)}</td><td class="r num">${i.paidC?money(i.paidC/100):'—'}</td><td class="r num">${money(i.owed/100)}</td><td class="r num">${i.age??'—'}d</td><td>${st}</td></tr>`}).join('')}</tbody></table>`;
+  $('openSub').textContent=hasInv?`${open.length} unpaid · ${a.list.filter(i=>i.inScope).length} submitted since ${usDate(a.from)||'the start'}`:'Upload invoices to see what hasn\'t been paid';
+
+  // exceptions
+  const ex=a.exceptions;
+  $('excCard').hidden=!ex.length;
+  if(ex.length) $('excTable').innerHTML=`<table><thead><tr><th>Invoice</th><th>Issue</th><th class="r">Paid</th><th>Remittance</th></tr></thead><tbody>${
+    ex.sort((x,y)=>x.inv.localeCompare(y.inv,undefined,{numeric:true})).map(e=>`<tr><td class="num">${esc(e.inv)}</td><td>${esc(e.what)}</td><td class="r num">${money(e.amt/100)}</td><td class="num">${esc([...new Set(e.refs)].join(', '))}</td></tr>`).join('')}</tbody></table>`;
+
+  renderCharts(a);
+}
+$('openTable').addEventListener('click',e=>{const h=e.target.closest('[data-sort]'); if(!h)return; const c=h.dataset.sort; sortBy=sortBy.col===c?{col:c,dir:-sortBy.dir}:{col:c,dir:c==='inv'||c==='cust'?1:-1}; render()});
+document.addEventListener('click',e=>{ if(e.target.closest('[data-upload]')) $('invIn').click() });
+$('q').addEventListener('input',render);
+$('since').addEventListener('change',e=>{since=e.target.value; try{localStorage.setItem(SINCE_KEY,since)}catch(x){} render()});
+document.querySelectorAll('[data-wk]').forEach(b=>b.addEventListener('click',()=>{weeks=+b.dataset.wk; document.querySelectorAll('[data-wk]').forEach(x=>x.setAttribute('aria-pressed',x===b)); render()}));
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>render());
+
+// ---------- Google Drive ----------
+let token=null,tokenExp=0,tokenClient=null,invFileId=null,saveTimer=null,saving=false,dirty=false;
+function msg(t,bad){const s=$('driveStatus'); s.textContent=t; s.classList.toggle('bad',!!bad)}
+const ready=()=>token&&Date.now()<tokenExp;
+function setBtn(){const b=$('driveBtn'); b.textContent=ready()?'Refresh from Drive':'Connect Google Drive'; b.classList.toggle('primary',!ready())}
+async function gfetch(url,opt={}){
+  if(!ready()){setBtn();throw new Error('expired')}
+  const r=await fetch(url,{...opt,headers:{...(opt.headers||{}),Authorization:'Bearer '+token}});
+  if(r.status===401){token=null;setBtn();throw new Error('expired')}
+  if(!r.ok) throw new Error('Drive error '+r.status); return r;
+}
+async function findFile(name){
+  const q=encodeURIComponent(`name='${name}' and trashed=false`);
+  const j=await (await gfetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&orderBy=modifiedTime desc&fields=files(id)`)).json();
+  return j.files?.[0]?.id||null;
+}
+const readFile = async id => (await gfetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`)).json();
+async function loadAll(){
+  msg('Loading from Google Drive…');
+  try{
+    const rid=await findFile(REMIT_FILE);
+    if(rid){ const j=await readFile(rid); remits=j.remits||[]; try{const o={};for(const p of remits)o[p.ref]=p;localStorage.setItem(REMIT_KEY,JSON.stringify(o))}catch(e){} }
+    invFileId=await findFile(INV_FILE);
+    if(invFileId){ const j=await readFile(invFileId); const local=invoices; invoices=j.invoices||{}; let extra=0; for(const k in local) if(!invoices[k]){invoices[k]=local[k];extra++} saveInvLocal(); if(extra) queueSave() }
+    else if(Object.keys(invoices).length) queueSave();
+    render();
+    msg(`Connected · ${remits.length} payments${rid?'':' (no Remittance Master Log found in Drive yet)'} · ${Object.keys(invoices).length} invoices`);
+  }catch(e){ msg(e.message==='expired'?'Google sign-in expired. Tap Connect Google Drive.':'Couldn’t reach Google Drive. Check your connection and try again.',true) }
+}
+async function saveInv(){
+  if(!ready()){ msg('Invoices are saved in this browser. Connect Google Drive to save them there too.',true); return }
+  if(saving){dirty=true;return} saving=true;
+  try{
+    const body=JSON.stringify({app:'fiber911-invoice-register',version:1,savedAt:new Date().toISOString(),invoices});
+    if(invFileId) await gfetch(`https://www.googleapis.com/upload/drive/v3/files/${invFileId}?uploadType=media`,{method:'PATCH',headers:{'Content-Type':'application/json'},body});
+    else{ const fd=new FormData(); fd.append('metadata',new Blob([JSON.stringify({name:INV_FILE,mimeType:'application/json'})],{type:'application/json'})); fd.append('file',new Blob([body],{type:'application/json'}));
+      invFileId=(await (await gfetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',body:fd})).json()).id }
+    msg(`Saved to Google Drive · ${remits.length} payments · ${Object.keys(invoices).length} invoices`);
+  }catch(e){ msg(e.message==='expired'?'Google sign-in expired. Tap Connect Google Drive and your invoices will save.':'Couldn’t save to Google Drive. Your invoices are kept in this browser.',true); dirty=true }
+  finally{ saving=false; if(dirty&&ready()){dirty=false;saveInv()} }
+}
+function queueSave(){clearTimeout(saveTimer);saveTimer=setTimeout(saveInv,800)}
+function initDrive(){
+  if(!window.google?.accounts?.oauth2){ if((initDrive.n=(initDrive.n||0)+1)>40){msg('Google sign-in didn’t load. Showing data saved in this browser.',true);return} setTimeout(initDrive,250); return }
+  tokenClient=google.accounts.oauth2.initTokenClient({client_id:GOOGLE_CLIENT_ID,scope:'https://www.googleapis.com/auth/drive.file',
+    callback:r=>{ if(r.error){msg('Google sign-in was cancelled.',true);return} token=r.access_token; tokenExp=Date.now()+(r.expires_in-60)*1000; setBtn(); loadAll() }});
+  msg(remits.length?`Showing ${remits.length} payments saved in this browser. Connect Google Drive for the latest.`:'Connect Google Drive to load your Remittance Master Log.');
+}
+$('driveBtn').addEventListener('click',()=>{ if(ready()) loadAll(); else tokenClient?.requestAccessToken() });
+
+render();
+initDrive();
+})();
+</script>
+</body>
+</html>
